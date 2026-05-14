@@ -1,0 +1,198 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import '../book_db.dart';
+import '../metadata.dart';
+
+class MetaEditScreen extends StatefulWidget {
+  final BookGroup group;
+  final BookDatabase? db;
+  const MetaEditScreen({super.key, required this.group, this.db});
+
+  @override
+  State<MetaEditScreen> createState() => _MetaEditScreenState();
+}
+
+class _MetaEditScreenState extends State<MetaEditScreen> {
+  late final TextEditingController _titleCtrl;
+  late final TextEditingController _authorCtrl;
+  late final TextEditingController _narratorCtrl;
+  late final TextEditingController _descCtrl;
+  String? _coverPath;
+
+  @override
+  void initState() {
+    super.initState();
+    // Check if meta exists on disk
+    final hasMeta = widget.group.hasMeta;
+    if (!hasMeta) {
+      // Schedule prompt after first frame
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _promptCreate();
+      });
+    }
+    final meta = widget.group.meta;
+    _titleCtrl = TextEditingController(text: meta.title);
+    _authorCtrl = TextEditingController(text: meta.author);
+    _narratorCtrl = TextEditingController(text: meta.narrator);
+    _descCtrl = TextEditingController(text: meta.description);
+    _coverPath = widget.group.coverPath;
+  }
+
+  void _promptCreate() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('未检测到元数据'),
+        content: const Text('该书还没有 .BookInformation 元数据。要自动创建吗？'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx); // close dialog
+              if (mounted) Navigator.pop(context); // go back to previous page
+            },
+            child: const Text('暂不'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await MetadataManager.createDefault(widget.group.folderPath);
+              widget.group.refreshMeta();
+              final meta = widget.group.meta;
+              setState(() {
+                _titleCtrl.text = meta.title;
+                _authorCtrl.text = meta.author;
+                _narratorCtrl.text = meta.narrator;
+                _descCtrl.text = meta.description;
+                _coverPath = widget.group.coverPath;
+              });
+            },
+            child: const Text('自动创建'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _authorCtrl.dispose();
+    _narratorCtrl.dispose();
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickCover() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.single;
+    if (file.path == null) return;
+
+    // Copy to .BookInformation/cover.jpg
+    final metaDir = MetadataManager.metaDir(widget.group.folderPath);
+    final dir = Directory(metaDir);
+    if (!await dir.exists()) await dir.create(recursive: true);
+    final ext = file.name.split('.').last;
+    final dest = File('$metaDir${Platform.pathSeparator}cover.$ext');
+    await File(file.path!).copy(dest.path);
+    widget.group.refreshMeta();
+    setState(() => _coverPath = dest.path);
+  }
+
+  Future<void> _save() async {
+    String? coverB64;
+    if (_coverPath != null) {
+      try {
+        final bytes = File(_coverPath!).readAsBytesSync();
+        coverB64 = base64.encode(bytes);
+      } catch (_) {}
+    }
+    final meta = BookMeta(
+      title: _titleCtrl.text.trim(),
+      author: _authorCtrl.text.trim(),
+      narrator: _narratorCtrl.text.trim(),
+      coverFileName: _coverPath?.split(Platform.pathSeparator).last ?? '',
+      coverBase64: coverB64 ?? '',
+      description: _descCtrl.text.trim(),
+    );
+    // Save to DB (works on all platforms)
+    widget.db?.setMeta(widget.group.folderKey, meta);
+    // Also try file system (silent fail if not available)
+    try { await MetadataManager.write(widget.group.folderPath, meta); } catch (_) {}
+    widget.group.refreshMeta();
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('编辑元数据'),
+        actions: [IconButton(icon: const Icon(Icons.check), onPressed: _save)],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            // Cover
+            Center(
+              child: GestureDetector(
+                onTap: _pickCover,
+                child: Container(
+                  width: 160,
+                  height: 160,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    image: _coverPath != null
+                        ? DecorationImage(
+                            image: FileImage(File(_coverPath!)),
+                            fit: BoxFit.cover,
+                          )
+                        : null,
+                  ),
+                  child: _coverPath == null
+                      ? const Icon(Icons.add_photo_alternate, size: 48)
+                      : null,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text('点击更换封面', style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _titleCtrl,
+              decoration: const InputDecoration(labelText: '书名', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _authorCtrl,
+              decoration: const InputDecoration(labelText: '作者', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _narratorCtrl,
+              decoration: const InputDecoration(labelText: '演播者', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _descCtrl,
+              decoration: const InputDecoration(labelText: '简介', border: OutlineInputBorder()),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: _save,
+              icon: const Icon(Icons.save),
+              label: const Text('保存'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
