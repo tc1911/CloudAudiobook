@@ -21,7 +21,6 @@
 |------|------|
 | Windows | ✅ 原生 exe |
 | Android | ✅ APK |
-| Web | ✅ 浏览器 |
 | macOS | ⬜ |
 | iOS | ⬜ |
 | Linux | ⬜ |
