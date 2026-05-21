@@ -3,6 +3,7 @@ import '../app.dart' show AudiobookCore, PlayerScreen, PlayerScreenState;
 import '../source.dart';
 import '../book_db.dart' show BookDatabase, BookGroup;
 import '../sync.dart';
+import '../theme_manager.dart';
 import '../platform_integration.dart';
 import '../platform/media_control.dart';
 import 'source_list.dart';
@@ -13,7 +14,13 @@ import 'settings.dart';
 class HomeShell extends StatefulWidget {
   final SourceManager sourceManager;
   final BookDatabase bookDb;
-  const HomeShell({super.key, required this.sourceManager, required this.bookDb});
+  final ThemeManager themeManager;
+  const HomeShell({
+    super.key,
+    required this.sourceManager,
+    required this.bookDb,
+    required this.themeManager,
+  });
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -180,6 +187,7 @@ class _HomeShellState extends State<HomeShell> {
           sourceManager: widget.sourceManager,
           bookDb: widget.bookDb,
           syncManager: _syncManager,
+          themeManager: widget.themeManager,
         ),
       ],
     );

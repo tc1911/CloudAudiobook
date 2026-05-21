@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:dynamic_color/dynamic_color.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -13,6 +15,7 @@ import 'source.dart';
 import 'screens/source_list.dart';
 import 'screens/home_shell.dart';
 import 'book_db.dart';
+import 'theme_manager.dart';
 import 'platform/media_control.dart';
 
 void initMediaKit() {
@@ -25,27 +28,57 @@ class AudiobookApp extends StatelessWidget {
   final int initialPositionMs;
   final SourceManager sourceManager;
   final BookDatabase bookDb;
+  final ThemeManager themeManager;
   const AudiobookApp({
     super.key,
     required this.initialPositionMs,
     required this.sourceManager,
     required this.bookDb,
+    required this.themeManager,
   });
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    final tm = themeManager;
+
+    Widget app = MaterialApp(
       title: '云听书',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF6750A4),
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
+      theme: tm.lightTheme,
+      darkTheme: tm.darkTheme,
+      themeMode: ThemeMode.dark,
+      home: HomeShell(
+        sourceManager: sourceManager,
+        bookDb: bookDb,
+        themeManager: themeManager,
       ),
-      home: HomeShell(sourceManager: sourceManager, bookDb: bookDb),
     );
+
+    // Wrap with DynamicColorBuilder only when in dynamic mode
+    if (Platform.isAndroid && tm.mode == 'dynamic') {
+      app = DynamicColorBuilder(
+        builder: (lightDynamic, darkDynamic) {
+          if (lightDynamic != null && darkDynamic != null) {
+            tm.updateDynamicColors(lightDynamic, darkDynamic);
+          }
+          // Rebuild with updated colors
+          return MaterialApp(
+            title: '云听书',
+            debugShowCheckedModeBanner: false,
+            theme: tm.lightTheme,
+            darkTheme: tm.darkTheme,
+            themeMode: ThemeMode.dark,
+            home: HomeShell(
+              sourceManager: sourceManager,
+              bookDb: bookDb,
+              themeManager: themeManager,
+            ),
+          );
+        },
+      );
+    }
+
+    return app;
   }
 }
 

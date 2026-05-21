@@ -3,7 +3,9 @@ import 'package:flutter/foundation.dart' show kReleaseMode, kProfileMode;
 import '../source.dart';
 import '../book_db.dart';
 import '../sync.dart';
+import '../theme_manager.dart';
 import 'sync_config.dart';
+import 'theme_settings.dart';
 
 const buildModeName = kReleaseMode ? 'Release' : (kProfileMode ? 'Profile' : 'Debug');
 
@@ -11,12 +13,14 @@ class SettingsScreen extends StatelessWidget {
   final SourceManager sourceManager;
   final BookDatabase bookDb;
   final SyncManager syncManager;
+  final ThemeManager themeManager;
 
   const SettingsScreen({
     super.key,
     required this.sourceManager,
     required this.bookDb,
     required this.syncManager,
+    required this.themeManager,
   });
 
   @override
@@ -25,6 +29,21 @@ class SettingsScreen extends StatelessWidget {
       appBar: AppBar(title: const Text('设置'), centerTitle: true),
       body: ListView(
         children: [
+          ListTile(
+            leading: const Icon(Icons.palette_outlined),
+            title: const Text('主题'),
+            subtitle: const Text('自定义配色方案'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ThemeSettingsScreen(themeManager: themeManager),
+                ),
+              );
+            },
+          ),
+          const Divider(),
           ListTile(
             leading: const Icon(Icons.sync_rounded),
             title: const Text('数据同步'),
@@ -52,7 +71,7 @@ class SettingsScreen extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.tag),
             title: const Text('版本'),
-            subtitle: Text('${buildModeName} v1.0.1 (build 2)'),
+            subtitle: Text('${buildModeName} v1.0.2 (build 3)'),
           ),
         ],
       ),
