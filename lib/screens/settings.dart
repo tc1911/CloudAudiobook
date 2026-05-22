@@ -71,7 +71,7 @@ class SettingsScreen extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.tag),
             title: const Text('版本'),
-            subtitle: Text('${buildModeName} v1.0.2 (build 3)'),
+            subtitle: Text('${buildModeName} v1.0.3 (build 4)'),
           ),
         ],
       ),
