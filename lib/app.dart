@@ -19,7 +19,7 @@ import 'theme_manager.dart';
 import 'platform/media_control.dart';
 
 void initMediaKit() {
-  if (!kIsWeb && (Platform.isWindows || Platform.isAndroid)) {
+  if (!kIsWeb && (Platform.isWindows || Platform.isAndroid || Platform.isLinux)) {
     MediaKit.ensureInitialized();
   }
 }
