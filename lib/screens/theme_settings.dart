@@ -24,6 +24,16 @@ class _ThemeSettingsScreenState extends State<ThemeSettingsScreen> {
   void _setMode(String mode) {
     setState(() => _mode = mode);
     widget.themeManager.setMode(mode);
+    _showRestartHint();
+  }
+
+  void _showRestartHint() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('重启应用后生效'),
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 
   void _pickColor() async {
@@ -34,6 +44,7 @@ class _ThemeSettingsScreenState extends State<ThemeSettingsScreen> {
     if (picked != null) {
       setState(() => _seedColor = picked);
       widget.themeManager.setSeedColor(picked);
+      _showRestartHint();
     }
   }
 
@@ -102,6 +113,7 @@ class _ThemeSettingsScreenState extends State<ThemeSettingsScreen> {
                     onSelected: (_) {
                       setState(() => _seedColor = preset.color);
                       widget.themeManager.setSeedColor(preset.color);
+                      _showRestartHint();
                     },
                   );
                 }).toList(),
