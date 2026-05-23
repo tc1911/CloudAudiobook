@@ -23,7 +23,7 @@
 | Android | ✅ APK |
 | macOS | ⬜ |
 | iOS | ⬜ |
-| Linux | ⬜ |
+| Linux | ✅ AppImage |
 
 ## 技术栈
 
