@@ -99,8 +99,6 @@ Icon=cloud-audiobook
 Type=Application
 Categories=AudioVideo;Player;
 DESKTOP
-
-    cp "$appdir/cloud-audiobook.desktop" "$appdir/"
     touch "$appdir/cloud-audiobook.png"
 
     # 打包 AppImage
