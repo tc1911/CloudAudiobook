@@ -48,6 +48,8 @@ jobs:
           cache: true
       - name: Install dependencies
         run: flutter pub get
+      - name: Reject local proxy configuration
+        run: '! grep -R "127\.0\.0\.1:\|proxyHost=127\.0\.0\.1\|proxyPort=7890" android'
       - name: Build APK
         run: flutter build apk --release
       - name: Upload APK
