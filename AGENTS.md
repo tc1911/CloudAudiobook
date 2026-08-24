@@ -18,7 +18,7 @@
 
 ## Builds
 
-- GitHub Actions is defined in `.github/workflows/build.yml`: pushes to `master`, `v*` tags, pull requests, and manual runs execute analyze/tests and build Android, Windows, and Linux artifacts.
+- GitHub Actions is defined in `.github/workflows/build.yml`: pushes to `master`, pull requests, and manual runs execute analyze/tests and build artifacts; pushing a matching `v<pubspec version>` tag additionally creates a GitHub Release from the generated artifacts.
 - Linux/macOS shell wrapper: `./scripts/build.sh [windows|android|linux|all] [debug|profile|release]` (defaults to `all release`). It runs `flutter pub get` and copies products to the sibling `../app/<Mode>/<platform>/` directory.
 - Windows wrapper: `scripts\build.bat [windows|android|all] [debug|profile|release]`; it supports Windows and Android only and also writes to the sibling `..\app` directory.
 - The shell `all` path attempts Windows and Android before Linux; use a platform-specific argument when the host/toolchain cannot build every target.

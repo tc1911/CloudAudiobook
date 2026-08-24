@@ -254,3 +254,51 @@ jobs:
         with:
           name: cloud-audiobook-linux
           path: ${{ runner.temp }}/cloud-audiobook-output/*
+
+  publish-release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-android, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: cloud-audiobook-*
+          path: dist
+          merge-multiple: true
+      - name: Prepare release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          raw_version="$(awk '/^version:/ {print $2; exit}' pubspec.yaml)"
+          version="${raw_version%%+*}"
+          test "$GITHUB_REF_NAME" = "v$version" || {
+            echo "Tag $GITHUB_REF_NAME does not match pubspec version $version" >&2
+            exit 1
+          }
+          release_dir="$RUNNER_TEMP/release-assets"
+          mkdir -p "$release_dir"
+
+          mv dist/cloud-audiobook_*.deb "$release_dir/"
+          mv dist/cloud-audiobook-*.rpm "$release_dir/"
+          mv dist/cloud-audiobook-*.pkg.tar.zst "$release_dir/"
+          mv dist/cloud-audiobook-v*.AppImage "$release_dir/"
+          mv dist/cloud-audiobook-linux-bundle.tar.gz "$release_dir/"
+
+          mv dist/app-release.apk "$release_dir/cloud-audiobook-v${version}-android.apk"
+          (cd dist && zip -qr "$release_dir/cloud-audiobook-v${version}-windows-x64.zip" .)
+          ls -lh "$release_dir"
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --verify-tag \
+            --title "CloudAudiobook $GITHUB_REF_NAME" \
+            --generate-notes \
+            "$RUNNER_TEMP/release-assets"/*

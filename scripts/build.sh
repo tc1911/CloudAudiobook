@@ -3,7 +3,7 @@
 # 用法: ./scripts/build.sh [windows|android|linux|all] [debug|profile|release]
 # 默认: ./scripts/build.sh all release
 
-set -e
+set -euo pipefail
 
 PLATFORM="${1:-all}"
 MODE="${2:-release}"
@@ -11,6 +11,15 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_APPS_DIR="$PROJECT_ROOT/../app"
 
 cd "$PROJECT_ROOT"
+
+case "$PLATFORM" in
+    windows|android|linux|all) ;;
+    *) echo "用法: $0 [windows|android|linux|all] [debug|profile|release]" >&2; exit 2 ;;
+esac
+case "$MODE" in
+    debug|profile|release) ;;
+    *) echo "用法: $0 [windows|android|linux|all] [debug|profile|release]" >&2; exit 2 ;;
+esac
 
 echo "========================================"
 echo "  云听书 CloudAudiobook 构建脚本"
@@ -68,6 +77,10 @@ build_android() {
 
 # Linux 构建
 build_linux() {
+    if [ "$MODE" != release ]; then
+        echo "[Linux] 打包格式只支持 release 模式" >&2
+        exit 2
+    fi
     echo "[Linux] 构建 release 版本..."
     flutter build linux --release
 
