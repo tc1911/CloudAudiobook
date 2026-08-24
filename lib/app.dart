@@ -14,6 +14,7 @@ import 'screens/home_shell.dart';
 import 'book_db.dart';
 import 'theme_manager.dart';
 import 'platform/media_control.dart';
+import 'platform/linux_mpris.dart';
 
 void initMediaKit() {
   if (!kIsWeb &&
@@ -261,6 +262,15 @@ class PlayerScreenState extends State<PlayerScreen> {
         positionMs: _core.position.inMilliseconds,
         durationMs: _core.duration.inMilliseconds,
       );
+      LinuxMpris().update(
+        title: _currentTitle,
+        artist: currentSource?.name ?? '',
+        playing: p,
+        position: _core.position,
+        duration: _core.duration,
+        canGoNext: _playlist.length > 1,
+        canGoPrevious: _playlist.length > 1,
+      );
       // Auto-next when playback completes (player stops and position >= duration)
       if (!p && _playlist.length > 1 && _core.duration > Duration.zero) {
         if (_core.position >=
@@ -417,6 +427,15 @@ class PlayerScreenState extends State<PlayerScreen> {
       }
     }
     setState(() {});
+    LinuxMpris().update(
+      title: _currentTitle,
+      artist: source.name,
+      playing: _core.isPlaying,
+      position: _core.position,
+      duration: _core.duration,
+      canGoNext: _playlist.length > 1,
+      canGoPrevious: _playlist.length > 1,
+    );
     if (autoPlay) _core.play();
   }
 

@@ -47,6 +47,7 @@ dependencies:
   xml: ^6.5.0
   dynamic_color: ^1.8.1
   crypto: ^3.0.6
+  dbus: ^0.7.15
 
 dev_dependencies:
   flutter_test:

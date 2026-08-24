@@ -1,0 +1,218 @@
+import 'dart:io' show Platform;
+
+import 'package:dbus/dbus.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
+
+typedef MediaCommand = Future<void> Function();
+
+const _mprisService = 'org.mpris.MediaPlayer2.CloudAudiobook';
+final _mprisPath = DBusObjectPath('/org/mpris/MediaPlayer2');
+const _mprisRootInterface = 'org.mpris.MediaPlayer2';
+const _mprisPlayerInterface = 'org.mpris.MediaPlayer2.Player';
+
+class LinuxMpris {
+  static final LinuxMpris _instance = LinuxMpris._();
+  factory LinuxMpris() => _instance;
+  LinuxMpris._();
+
+  DBusClient? _client;
+  _MprisPlayer? _player;
+
+  Future<void> initialize({
+    required MediaCommand onPlay,
+    required MediaCommand onPause,
+    required MediaCommand onNext,
+    required MediaCommand onPrevious,
+  }) async {
+    if (!Platform.isLinux) return;
+    try {
+      final client = DBusClient.session();
+      final reply = await client.requestName(_mprisService);
+      if (reply != DBusRequestNameReply.primaryOwner &&
+          reply != DBusRequestNameReply.alreadyOwner) {
+        await client.close();
+        return;
+      }
+      final player = _MprisPlayer(
+        _mprisPath,
+        onPlay: onPlay,
+        onPause: onPause,
+        onNext: onNext,
+        onPrevious: onPrevious,
+      );
+      await client.registerObject(player);
+      _client = client;
+      _player = player;
+    } catch (e) {
+      debugPrint('[MPRIS] initialize error: $e');
+    }
+  }
+
+  Future<void> update({
+    required String title,
+    String artist = '',
+    required bool playing,
+    required Duration position,
+    required Duration duration,
+    required bool canGoNext,
+    required bool canGoPrevious,
+  }) async {
+    final player = _player;
+    if (player == null) return;
+    player.update(
+      title: title,
+      artist: artist,
+      playing: playing,
+      position: position,
+      duration: duration,
+      canGoNext: canGoNext,
+      canGoPrevious: canGoPrevious,
+    );
+    await player.emitPropertiesChanged(
+      _mprisPlayerInterface,
+      changedProperties: player.changedProperties(),
+    );
+  }
+
+  Future<void> dispose() async {
+    final client = _client;
+    final player = _player;
+    if (client != null && player != null) {
+      await client.unregisterObject(player);
+      await client.releaseName(_mprisService);
+      await client.close();
+    }
+    _client = null;
+    _player = null;
+  }
+}
+
+class _MprisPlayer extends DBusObject {
+  _MprisPlayer(
+    super.path, {
+    required this.onPlay,
+    required this.onPause,
+    required this.onNext,
+    required this.onPrevious,
+  });
+
+  final MediaCommand onPlay;
+  final MediaCommand onPause;
+  final MediaCommand onNext;
+  final MediaCommand onPrevious;
+
+  String title = '';
+  String artist = '';
+  bool playing = false;
+  Duration position = Duration.zero;
+  Duration duration = Duration.zero;
+  bool canGoNext = false;
+  bool canGoPrevious = false;
+
+  void update({
+    required String title,
+    required String artist,
+    required bool playing,
+    required Duration position,
+    required Duration duration,
+    required bool canGoNext,
+    required bool canGoPrevious,
+  }) {
+    this.title = title;
+    this.artist = artist;
+    this.playing = playing;
+    this.position = position;
+    this.duration = duration;
+    this.canGoNext = canGoNext;
+    this.canGoPrevious = canGoPrevious;
+  }
+
+  Map<String, DBusValue> changedProperties() => {
+    'PlaybackStatus': DBusString(playing ? 'Playing' : 'Paused'),
+    'Position': DBusInt64(position.inMicroseconds),
+    'CanGoNext': DBusBoolean(canGoNext),
+    'CanGoPrevious': DBusBoolean(canGoPrevious),
+    'Metadata': _metadata,
+  };
+
+  DBusDict get _metadata => DBusDict.stringVariant({
+    'mpris:trackid': DBusObjectPath('/org/mpris/MediaPlayer2/Track/1'),
+    'xesam:title': DBusArray.string([title]),
+    'xesam:artist': DBusArray.string([artist]),
+    'mpris:length': DBusInt64(duration.inMicroseconds),
+  });
+
+  @override
+  List<DBusIntrospectInterface> introspect() => [
+    DBusIntrospectInterface(_mprisRootInterface),
+    DBusIntrospectInterface(
+      _mprisPlayerInterface,
+      methods: [
+        for (final name in ['Play', 'Pause', 'PlayPause', 'Next', 'Previous'])
+          DBusIntrospectMethod(name),
+      ],
+      properties: [
+        DBusIntrospectProperty('PlaybackStatus', DBusSignature('s')),
+        DBusIntrospectProperty('Metadata', DBusSignature('a{sv}')),
+        DBusIntrospectProperty('Position', DBusSignature('x')),
+        DBusIntrospectProperty('CanGoNext', DBusSignature('b')),
+        DBusIntrospectProperty('CanGoPrevious', DBusSignature('b')),
+        DBusIntrospectProperty('CanPlay', DBusSignature('b')),
+        DBusIntrospectProperty('CanPause', DBusSignature('b')),
+        DBusIntrospectProperty('CanSeek', DBusSignature('b')),
+        DBusIntrospectProperty('CanControl', DBusSignature('b')),
+      ],
+    ),
+  ];
+
+  @override
+  Future<DBusMethodResponse> handleMethodCall(DBusMethodCall call) async {
+    if (call.interface != _mprisPlayerInterface) {
+      return DBusMethodSuccessResponse();
+    }
+    switch (call.name) {
+      case 'Play':
+        await onPlay();
+      case 'Pause':
+        await onPause();
+      case 'PlayPause':
+        await (playing ? onPause() : onPlay());
+      case 'Next':
+        await onNext();
+      case 'Previous':
+        await onPrevious();
+    }
+    return DBusMethodSuccessResponse();
+  }
+
+  @override
+  Future<DBusMethodResponse> getProperty(String interface, String name) async {
+    if (interface == _mprisRootInterface) {
+      final value = <String, DBusValue>{
+        'CanQuit': DBusBoolean(true),
+        'CanRaise': DBusBoolean(true),
+        'HasTrackList': DBusBoolean(false),
+        'Identity': DBusString('云听书'),
+        'DesktopEntry': DBusString('cloud-audiobook'),
+        'SupportedUriSchemes': DBusArray.string([]),
+        'SupportedMimeTypes': DBusArray.string([]),
+      }[name];
+      if (value != null) return DBusGetPropertyResponse(value);
+    }
+    if (interface == _mprisPlayerInterface) {
+      final value = <String, DBusValue>{
+        'PlaybackStatus': DBusString(playing ? 'Playing' : 'Paused'),
+        'Metadata': _metadata,
+        'Position': DBusInt64(position.inMicroseconds),
+        'CanGoNext': DBusBoolean(canGoNext),
+        'CanGoPrevious': DBusBoolean(canGoPrevious),
+        'CanPlay': DBusBoolean(title.isNotEmpty),
+        'CanPause': DBusBoolean(playing),
+        'CanSeek': DBusBoolean(true),
+        'CanControl': DBusBoolean(true),
+      }[name];
+      if (value != null) return DBusGetPropertyResponse(value);
+    }
+    return DBusGetPropertyResponse(DBusString(''));
+  }
+}

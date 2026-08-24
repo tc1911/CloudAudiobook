@@ -25,6 +25,9 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  media_channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+      flutter_controller_->engine()->messenger(), "com.cloudaudiobook/media",
+      &flutter::StandardMethodCodec::GetInstance());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
@@ -41,6 +44,7 @@ bool FlutterWindow::OnCreate() {
 
 void FlutterWindow::OnDestroy() {
   if (flutter_controller_) {
+    media_channel_.reset();
     flutter_controller_ = nullptr;
   }
 
@@ -62,6 +66,32 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   }
 
   switch (message) {
+    case WM_APPCOMMAND: {
+      const auto command = GET_APPCOMMAND_LPARAM(lparam);
+      const char* method = nullptr;
+      switch (command) {
+        case APPCOMMAND_MEDIA_PLAY:
+          method = "onPlay";
+          break;
+        case APPCOMMAND_MEDIA_PAUSE:
+          method = "onPause";
+          break;
+        case APPCOMMAND_MEDIA_PLAY_PAUSE:
+          method = "onPlayPause";
+          break;
+        case APPCOMMAND_MEDIA_NEXTTRACK:
+          method = "onNext";
+          break;
+        case APPCOMMAND_MEDIA_PREVIOUSTRACK:
+          method = "onPrev";
+          break;
+      }
+      if (method != nullptr && media_channel_) {
+        media_channel_->InvokeMethod(method, nullptr);
+        return 0;
+      }
+      break;
+    }
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
       break;

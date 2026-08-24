@@ -6,6 +6,7 @@ import '../sync.dart';
 import '../theme_manager.dart';
 import '../platform_integration.dart';
 import '../platform/media_control.dart';
+import '../platform/linux_mpris.dart';
 import 'source_list.dart';
 import 'bookshelf.dart';
 import 'settings.dart';
@@ -42,6 +43,12 @@ class _HomeShellState extends State<HomeShell> {
       _autoResume();
       _autoSync();
       _platformIntegration.init();
+      LinuxMpris().initialize(
+        onPlay: () async => _playerKey.currentState?.forcePlay(),
+        onPause: () async => _playerKey.currentState?.forcePause(),
+        onNext: () async => _playerKey.currentState?.callPlayNext?.call(),
+        onPrevious: () async => _playerKey.currentState?.callPlayPrev?.call(),
+      );
     });
   }
 
@@ -52,6 +59,9 @@ class _HomeShellState extends State<HomeShell> {
     };
     mc.onPause = () {
       _playerKey.currentState?.forcePause();
+    };
+    mc.onToggle = () {
+      _playerKey.currentState?.togglePlay();
     };
     mc.onNext = () {
       _playerKey.currentState?.callPlayNext?.call();
@@ -69,6 +79,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void dispose() {
     _platformIntegration.dispose();
+    LinuxMpris().dispose();
     _core.dispose();
     _syncManager.dispose();
     super.dispose();

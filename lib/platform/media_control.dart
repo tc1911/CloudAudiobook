@@ -9,13 +9,14 @@ class MediaControl {
   static final MediaControl _instance = MediaControl._();
   factory MediaControl() => _instance;
   MediaControl._() {
-    if (Platform.isAndroid) {
+    if (Platform.isAndroid || Platform.isWindows) {
       _channel.setMethodCallHandler(_handleCall);
     }
   }
 
   void Function()? onPlay;
   void Function()? onPause;
+  void Function()? onToggle;
   void Function()? onNext;
   void Function()? onPrev;
 
@@ -83,6 +84,8 @@ class MediaControl {
         onPlay?.call();
       case 'onPause':
         onPause?.call();
+      case 'onPlayPause':
+        onToggle?.call();
       case 'onNext':
         onNext?.call();
       case 'onPrev':
