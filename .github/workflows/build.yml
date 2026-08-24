@@ -191,38 +191,29 @@ jobs:
           rpmbuild --define "_topdir $rpm_top" -bb "$rpm_top/SPECS/cloud-audiobook.spec" >/dev/null
           cp "$rpm_top/RPMS/x86_64/"*.rpm "$output/"
 
-          mkdir -p "$output/arch-root" "$output/arch-work"
-          cp -a "$root/." "$output/arch-root/"
-          cat > "$output/arch-work/PKGBUILD" <<'PKGBUILD'
-          pkgname=cloud-audiobook
-          pkgver=__VERSION__
-          pkgrel=__REVISION__
-          pkgdesc='Private audiobook library and player'
-          arch=('x86_64')
-          license=('MIT')
-          depends=('gtk3' 'mpv')
-          source=()
-          sha256sums=()
-
-          package() {
-            cp -a "$startdir/../arch-root/." "$pkgdir/"
-          }
-          PKGBUILD
-          sed -i "s/__VERSION__/$version/; s/__REVISION__/$revision/" "$output/arch-work/PKGBUILD"
-          docker run --rm -v "$output:/workspace" archlinux:latest bash -euxo pipefail -c '
-            pacman -Sy --noconfirm base-devel
-            useradd --create-home builder
-            chown -R builder:builder /workspace/arch-work
-            su builder -c "cd /workspace/arch-work && makepkg --force --nodeps"
-            arch_package="$(find /workspace/arch-work -maxdepth 1 -type f \
-              -name "cloud-audiobook-*.pkg.tar.zst" \
-              ! -name "*-debug-*" -print -quit)"
-            test -n "$arch_package"
-            cp "$arch_package" /workspace/cloud-audiobook-arch.pkg.tar.zst
-            chmod 0644 /workspace/cloud-audiobook-arch.pkg.tar.zst
-            rm -rf /workspace/arch-root /workspace/arch-work
-          '
-          test -s "$output/cloud-audiobook-arch.pkg.tar.zst"
+          arch_root="$RUNNER_TEMP/cloud-audiobook-arch-root"
+          rm -rf "$arch_root"
+          mkdir -p "$arch_root"
+          cp -a "$root/." "$arch_root/"
+          package_size="$(du -sk "$arch_root" | awk '{print $1 * 1024}')"
+          cat > "$arch_root/.PKGINFO" <<PKGINFO
+          pkgname = cloud-audiobook
+          pkgbase = cloud-audiobook
+          pkgver = ${version}-${revision}
+          pkgdesc = Private audiobook library and player
+          url = https://github.com/tc1911/CloudAudiobook
+          builddate = $(date +%s)
+          packager = CloudAudiobook
+          size = $package_size
+          arch = x86_64
+          license = MIT
+          depend = gtk3
+          depend = mpv
+          PKGINFO
+          tar --zstd --format=gnu --owner=0 --group=0 --numeric-owner \
+            -C "$arch_root" \
+            -cf "$output/cloud-audiobook-${version}-${revision}-x86_64.pkg.tar.zst" .
+          test -s "$output/cloud-audiobook-${version}-${revision}-x86_64.pkg.tar.zst"
 
           appdir="$RUNNER_TEMP/CloudAudiobook.AppDir"
           mkdir -p "$appdir/usr/bin/data" "$appdir/usr/bin/lib"
