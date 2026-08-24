@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'metadata.dart';
@@ -64,9 +63,7 @@ class BookRecord {
 
 class BookDatabase {
   static const _key = 'cloud_audiobook_books';
-  static const _metaKey = 'cloud_audiobook_book_meta';
   List<BookRecord> books = [];
-  final Map<String, BookMeta> metas = {};
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -77,14 +74,6 @@ class BookDatabase {
           .map((e) => BookRecord.fromJson(e as Map<String, dynamic>))
           .toList();
     }
-    final metaJson = prefs.getString(_metaKey);
-    if (metaJson != null) {
-      final map = jsonDecode(metaJson) as Map<String, dynamic>;
-      metas.clear();
-      for (final e in map.entries) {
-        metas[e.key] = BookMeta.fromJson(e.value as Map<String, dynamic>);
-      }
-    }
   }
 
   Future<void> save() async {
@@ -93,23 +82,6 @@ class BookDatabase {
       _key,
       jsonEncode(books.map((b) => b.toJson()).toList()),
     );
-  }
-
-  Future<void> saveMetas() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _metaKey,
-      jsonEncode(metas.map((k, v) => MapEntry(k, v.toJson()))),
-    );
-  }
-
-  BookMeta getMeta(String folderKey) {
-    return metas[folderKey] ?? BookMeta();
-  }
-
-  void setMeta(String folderKey, BookMeta meta) {
-    metas[folderKey] = meta;
-    saveMetas();
   }
 
   BookRecord? findByPath(String path, String sourceName) {
@@ -239,12 +211,6 @@ class BookGroup {
     _metaExistsCache = null;
   }
 
-  /// Bind a BookDatabase for fallback meta lookups
-  static BookDatabase? _db;
-  static void bindDb(BookDatabase db) {
-    _db = db;
-  }
-
   BookMeta get meta {
     if (_metaCache != null) return _metaCache!;
     // Try file-based first
@@ -256,13 +222,6 @@ class BookGroup {
         return m;
       }
     } catch (_) {}
-    // Fallback to database
-    final dbMeta = _db?.getMeta(folderKey);
-    if (dbMeta != null && dbMeta.title.isNotEmpty) {
-      _metaExistsCache = true;
-      _metaCache = dbMeta;
-      return dbMeta;
-    }
     _metaExistsCache = false;
     _metaCache = _fallbackMeta;
     return _metaCache!;
@@ -285,12 +244,6 @@ class BookGroup {
     // Try file-based (.BookInformation/cover.*)
     final fileCover = MetadataManager.coverPath(folderPath);
     if (fileCover != null) return fileCover;
-    // Try DB cached path (from sync download)
-    final dbMeta = _db?.getMeta(folderKey);
-    if (dbMeta != null && dbMeta.coverFileName.isNotEmpty) {
-      final f = File(dbMeta.coverFileName);
-      if (f.existsSync()) return f.path;
-    }
     return null;
   }
 

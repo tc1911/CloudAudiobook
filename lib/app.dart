@@ -15,6 +15,7 @@ import 'book_db.dart';
 import 'theme_manager.dart';
 import 'platform/media_control.dart';
 import 'platform/linux_mpris.dart';
+import 'platform/windows_media_session.dart';
 
 void initMediaKit() {
   if (!kIsWeb &&
@@ -262,6 +263,10 @@ class PlayerScreenState extends State<PlayerScreen> {
     _positionSubscription = _core.positionStream.listen((p) {
       setState(() => _position = p);
       LinuxMpris().updatePosition(p);
+      WindowsMediaSession().updatePlaybackState(
+        playing: _isPlaying,
+        position: p,
+      );
     });
     _durationSubscription = _core.durationStream.listen((d) {
       setState(() => _duration = d);
@@ -273,6 +278,10 @@ class PlayerScreenState extends State<PlayerScreen> {
         duration: d,
         canGoNext: _playlist.length > 1,
         canGoPrevious: _playlist.length > 1,
+      );
+      WindowsMediaSession().updatePlaybackState(
+        playing: _isPlaying,
+        position: _core.position,
       );
     });
     _playingSubscription = _core.playingStream.listen((p) {
@@ -441,6 +450,11 @@ class PlayerScreenState extends State<PlayerScreen> {
         title: item.name,
         artist: source.name,
         coverPath: _coverFilePath,
+      );
+      WindowsMediaSession().updateMetadata(
+        title: item.name,
+        artist: source.name,
+        duration: _core.duration,
       );
       MediaControl().updatePlaybackState(
         playing: _core.isPlaying,

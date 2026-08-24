@@ -4,39 +4,42 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 
 /// Metadata for a book (stored in .BookInformation/metadata.json)
 class BookMeta {
+  static const schemaVersion = 1;
   String title;
   String author;
   String narrator;
-  String coverFileName; // e.g. "cover.jpg"
-  String coverBase64; // base64 encoded image data (for sync)
+  String cover; // relative to .BookInformation, e.g. "cover.jpg"
   String description;
 
   BookMeta({
     this.title = '',
     this.author = '',
     this.narrator = '',
-    this.coverFileName = '',
-    this.coverBase64 = '',
+    this.cover = '',
     this.description = '',
   });
 
   Map<String, dynamic> toJson() => {
-        'title': title,
-        'author': author,
-        'narrator': narrator,
-        'coverFileName': coverFileName,
-        'coverBase64': coverBase64,
-        'description': description,
-      };
+    'schemaVersion': schemaVersion,
+    'title': title,
+    'author': author,
+    'narrator': narrator,
+    'cover': cover,
+    'description': description,
+  };
 
-  factory BookMeta.fromJson(Map<String, dynamic> json) => BookMeta(
-        title: json['title'] as String? ?? '',
-        author: json['author'] as String? ?? '',
-        narrator: json['narrator'] as String? ?? '',
-        coverFileName: json['coverFileName'] as String? ?? '',
-        coverBase64: json['coverBase64'] as String? ?? '',
-        description: json['description'] as String? ?? '',
-      );
+  factory BookMeta.fromJson(Map<String, dynamic> json) {
+    if (json['schemaVersion'] != schemaVersion) {
+      throw const FormatException('Unsupported metadata schema');
+    }
+    return BookMeta(
+      title: json['title'] as String? ?? '',
+      author: json['author'] as String? ?? '',
+      narrator: json['narrator'] as String? ?? '',
+      cover: json['cover'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+    );
+  }
 }
 
 /// Manager for .BookInformation directory
@@ -117,12 +120,9 @@ class MetadataManager {
   /// Get cover image path
   static String? coverPath(String folderPath) {
     final metaDirPath = metaDir(folderPath);
-    final dir = Directory(metaDirPath);
-    if (!dir.existsSync()) return null;
-    for (final ext in ['jpg', 'jpeg', 'png', 'webp']) {
-      final f = File('$metaDirPath${Platform.pathSeparator}cover.$ext');
-      if (f.existsSync()) return f.path;
-    }
-    return null;
+    final meta = readSync(folderPath);
+    if (meta == null || meta.cover.isEmpty) return null;
+    final file = File('$metaDirPath${Platform.pathSeparator}${meta.cover}');
+    return file.existsSync() ? file.path : null;
   }
 }

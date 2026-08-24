@@ -1,14 +1,9 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:async';
-import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'source.dart';
 import 'book_db.dart';
-import 'metadata.dart';
 
 class SyncManager {
   static const _syncConfigKey = 'cloud_audiobook_sync_config';
@@ -100,11 +95,6 @@ class SyncManager {
 
   // ─── Upload / Download ───
 
-  String _coverId(BookGroup group) {
-    final key = '${group.sourceName}:${group.folderKey}';
-    return sha256.convert(utf8.encode(key)).toString().substring(0, 32);
-  }
-
   WebdavSource? _findSource(SourceManager manager) {
     if (sourceName == null) return null;
     for (final s in manager.sources) {
@@ -128,27 +118,6 @@ class SyncManager {
       await _putFile(source, '$basePath/sources.json', sourcesJson);
       final booksJson = jsonEncode(books.books.map((b) => b.toJson()).toList());
       await _putFile(source, '$basePath/books.json', booksJson);
-      final metasJson = jsonEncode(
-        books.metas.map((k, v) => MapEntry(k, v.toJson())),
-      );
-      await _putFile(source, '$basePath/metas.json', metasJson);
-      // Upload cover images (ensure covers/ dir exists first)
-      await _mkcol(source, '$basePath/covers');
-      for (final group in books.bookGroups) {
-        final cover = group.coverPath;
-        if (cover != null) {
-          try {
-            final bytes = File(cover).readAsBytesSync();
-            final ext = cover.split('.').last;
-            final path = '$basePath/covers/${_coverId(group)}.$ext';
-            print('[Sync] cover upload $path: ${bytes.length} bytes');
-            await _putRawFile(source, path, bytes);
-            print('[Sync] cover upload OK');
-          } catch (e) {
-            print('[Sync] cover upload error: $e');
-          }
-        }
-      }
       debugPrint('[Sync] upload OK');
       return null;
     } catch (e) {
@@ -195,77 +164,12 @@ class SyncManager {
         }
         await books.save();
       }
-      // Download metas
-      final metasBody = await _getFile(source, '$basePath/metas.json');
-      if (metasBody != null) {
-        final remoteMetas = jsonDecode(metasBody) as Map<String, dynamic>;
-        for (final e in remoteMetas.entries) {
-          books.metas[e.key] = BookMeta.fromJson(
-            e.value as Map<String, dynamic>,
-          );
-        }
-        await books.saveMetas();
-      }
-      // Download cover images
-      for (final group in books.bookGroups) {
-        for (final ext in ['jpg', 'jpeg', 'png', 'webp']) {
-          final path = '$basePath/covers/${_coverId(group)}.$ext';
-          final coverBytes = await _getRawFile(source, path);
-          print(
-            '[Sync] cover download $path: ${coverBytes != null ? "${coverBytes.length} bytes" : "NOT FOUND"}',
-          );
-          if (coverBytes != null) {
-            final appDir = await getApplicationDocumentsDirectory();
-            final dest = File(
-              '${appDir.path}/cloud_audiobook_cover_${_coverId(group)}.$ext',
-            );
-            await dest.writeAsBytes(coverBytes);
-            print('[Sync] cover saved to ${dest.path}');
-            final meta = books.getMeta(group.folderKey);
-            meta.coverFileName = dest.path;
-            books.setMeta(group.folderKey, meta);
-            group.refreshMeta();
-            break;
-          }
-        }
-      }
       debugPrint('[Sync] download OK');
       return null;
     } catch (e) {
       debugPrint('[Sync] download error: $e');
       return '下载失败: $e';
     }
-  }
-
-  Future<void> _mkcol(WebdavSource source, String path) async {
-    final url = source.url(path);
-    final client = source.httpClient;
-    try {
-      // Ignore errors — directory may already exist
-      await client.send(
-        http.Request('MKCOL', Uri.parse(url))
-          ..headers['Authorization'] = source.authHeader(),
-      );
-    } catch (_) {}
-  }
-
-  Future<void> _putRawFile(
-    WebdavSource source,
-    String path,
-    List<int> bytes,
-  ) async {
-    final url = source.url(path);
-    final client = source.httpClient;
-    final resp = await client.put(
-      Uri.parse(url),
-      headers: {
-        'Authorization': source.authHeader(),
-        'Content-Type': 'application/octet-stream',
-      },
-      body: bytes,
-    );
-    if (resp.statusCode >= 400)
-      throw Exception('PUT $path: ${resp.statusCode}');
   }
 
   Future<void> _putFile(
@@ -285,18 +189,6 @@ class SyncManager {
     );
     if (resp.statusCode >= 400)
       throw Exception('PUT $path: ${resp.statusCode}');
-  }
-
-  Future<List<int>?> _getRawFile(WebdavSource source, String path) async {
-    final url = source.url(path);
-    final client = source.httpClient;
-    final resp = await client.get(
-      Uri.parse(url),
-      headers: {'Authorization': source.authHeader()},
-    );
-    if (resp.statusCode == 404) return null;
-    if (resp.statusCode >= 400) return null;
-    return resp.bodyBytes;
   }
 
   Future<String?> _getFile(WebdavSource source, String path) async {

@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import '../app.dart' show AudiobookCore, PlayerScreen, PlayerScreenState;
 import '../source.dart';
-import '../book_db.dart' show BookDatabase, BookGroup;
+import '../book_db.dart' show BookDatabase;
 import '../sync.dart';
 import '../theme_manager.dart';
 import '../platform_integration.dart';
 import '../platform/media_control.dart';
 import '../platform/linux_mpris.dart';
+import '../playback_controller.dart';
+import '../platform/windows_media_session.dart';
 import 'source_list.dart';
 import 'bookshelf.dart';
 import 'settings.dart';
@@ -32,41 +34,57 @@ class _HomeShellState extends State<HomeShell> {
   final GlobalKey<PlayerScreenState> _playerKey = GlobalKey();
   final SyncManager _syncManager = SyncManager();
   final PlatformIntegration _platformIntegration = PlatformIntegration();
+  final PlaybackController _playbackController = PlaybackController();
 
   @override
   void initState() {
     super.initState();
     _syncManager.bind(widget.sourceManager, widget.bookDb);
-    BookGroup.bindDb(widget.bookDb);
     _initMediaControl();
+    _playbackController.bind(
+      play: () async => _playerKey.currentState?.forcePlay(),
+      pause: () async => _playerKey.currentState?.forcePause(),
+      next: () async => _playerKey.currentState?.callPlayNext?.call(),
+      previous: () async => _playerKey.currentState?.callPlayPrev?.call(),
+      seek: (position) async => _playerKey.currentState?.seekTo(position),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _autoResume();
       _autoSync();
       _platformIntegration.init(
         onPlay: () async {
-          await _playerKey.currentState?.forcePlay();
+          await _playbackController.play();
         },
         onPause: () async {
-          await _playerKey.currentState?.forcePause();
+          await _playbackController.pause();
         },
-        onNext: () async => _playerKey.currentState?.callPlayNext?.call(),
-        onPrevious: () async => _playerKey.currentState?.callPlayPrev?.call(),
+        onNext: _playbackController.next,
+        onPrevious: _playbackController.previous,
         onExit: () async {
           await _core.saveNow();
           await LinuxMpris().dispose();
+          await WindowsMediaSession().dispose();
           _syncManager.dispose();
         },
       );
+      WindowsMediaSession().initialize(
+        onPlay: _playbackController.play,
+        onPause: _playbackController.pause,
+        onNext: _playbackController.next,
+        onPrevious: _playbackController.previous,
+        onStop: _playbackController.pause,
+        onSeek: _playbackController.seek,
+      );
       LinuxMpris().initialize(
         onPlay: () async {
-          await _playerKey.currentState?.forcePlay();
+          await _playbackController.play();
         },
         onPause: () async {
-          await _playerKey.currentState?.forcePause();
+          await _playbackController.pause();
         },
-        onNext: () async => _playerKey.currentState?.callPlayNext?.call(),
-        onPrevious: () async => _playerKey.currentState?.callPlayPrev?.call(),
-        onSeek: (position) async => _playerKey.currentState?.seekTo(position),
+        onNext: _playbackController.next,
+        onPrevious: _playbackController.previous,
+        onSeek: _playbackController.seek,
       );
     });
   }
@@ -74,19 +92,19 @@ class _HomeShellState extends State<HomeShell> {
   void _initMediaControl() {
     final mc = MediaControl();
     mc.onPlay = () {
-      _playerKey.currentState?.forcePlay();
+      _playbackController.play();
     };
     mc.onPause = () {
-      _playerKey.currentState?.forcePause();
+      _playbackController.pause();
     };
     mc.onToggle = () {
       _playerKey.currentState?.togglePlay();
     };
     mc.onNext = () {
-      _playerKey.currentState?.callPlayNext?.call();
+      _playbackController.next();
     };
     mc.onPrev = () {
-      _playerKey.currentState?.callPlayPrev?.call();
+      _playbackController.previous();
     };
   }
 
@@ -99,8 +117,10 @@ class _HomeShellState extends State<HomeShell> {
   void dispose() {
     _platformIntegration.dispose();
     LinuxMpris().dispose();
+    WindowsMediaSession().dispose();
     _core.dispose();
     _syncManager.dispose();
+    _playbackController.clear();
     super.dispose();
   }
 

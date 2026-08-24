@@ -4,6 +4,7 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   dynamic_color
+  flutter_media_session
   media_kit_libs_windows_audio
   screen_retriever_windows
   tray_manager

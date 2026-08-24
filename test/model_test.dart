@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:cloud_audiobook/book_db.dart';
+import 'package:cloud_audiobook/metadata.dart';
+import 'package:cloud_audiobook/playback_controller.dart';
 import 'package:cloud_audiobook/source.dart';
 
 void main() {
@@ -63,5 +65,40 @@ void main() {
     expect(synced['username'], 'user');
     expect(synced.containsKey('password'), isFalse);
     expect(config.toJson()['password'], 'secret');
+  });
+
+  test('metadata uses only the current folder schema', () {
+    final meta = BookMeta(title: 'Book', cover: 'cover.jpg');
+    final json = meta.toJson();
+
+    expect(json['schemaVersion'], BookMeta.schemaVersion);
+    expect(json['cover'], 'cover.jpg');
+    expect(json.containsKey('coverFileName'), isFalse);
+    expect(json.containsKey('coverBase64'), isFalse);
+    expect(BookMeta.fromJson(json).title, 'Book');
+    expect(
+      () => BookMeta.fromJson({'title': 'Old format'}),
+      throwsA(isA<FormatException>()),
+    );
+  });
+
+  test('playback controller routes external commands', () async {
+    final events = <String>[];
+    final controller = PlaybackController();
+    controller.bind(
+      play: () async => events.add('play'),
+      pause: () async => events.add('pause'),
+      next: () async => events.add('next'),
+      previous: () async => events.add('previous'),
+      seek: (position) async => events.add('seek:${position.inSeconds}'),
+    );
+
+    await controller.play();
+    await controller.pause();
+    await controller.next();
+    await controller.previous();
+    await controller.seek(const Duration(seconds: 12));
+
+    expect(events, ['play', 'pause', 'next', 'previous', 'seek:12']);
   });
 }

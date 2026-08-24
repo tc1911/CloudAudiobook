@@ -6,6 +6,7 @@
 - The runtime entrypoint is `lib/main.dart`: it initializes media playback, loads `SourceManager`, `BookDatabase`, and `ThemeManager`, then starts `AudiobookApp` from `lib/app.dart`.
 - Most player behavior and UI currently lives in `lib/app.dart`; storage/source models are in `lib/book_db.dart` and `lib/source.dart`, with feature screens under `lib/screens/`.
 - User data is persisted through `shared_preferences` (source configuration, book history/metadata, playback positions). Avoid changing preference keys or serialized fields without considering existing local data.
+- Book metadata is stored only in each audiobook folder's `.BookInformation/metadata.json` with `schemaVersion: 1`; old metadata formats are intentionally not migrated. Playback history, positions, and favorites remain in `shared_preferences`.
 - `lib/source.dart` implements local files, WebDAV, and SMB sources. WebDAV uses Basic auth and deliberately accepts self-signed certificates; preserve that behavior unless the task explicitly changes security policy.
 
 ## Commands

@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -7,8 +6,7 @@ import '../metadata.dart';
 
 class MetaEditScreen extends StatefulWidget {
   final BookGroup group;
-  final BookDatabase? db;
-  const MetaEditScreen({super.key, required this.group, this.db});
+  const MetaEditScreen({super.key, required this.group});
 
   @override
   State<MetaEditScreen> createState() => _MetaEditScreenState();
@@ -85,9 +83,7 @@ class _MetaEditScreenState extends State<MetaEditScreen> {
   }
 
   Future<void> _pickCover() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-    );
+    final result = await FilePicker.platform.pickFiles(type: FileType.image);
     if (result == null || result.files.isEmpty) return;
     final file = result.files.single;
     if (file.path == null) return;
@@ -104,25 +100,14 @@ class _MetaEditScreenState extends State<MetaEditScreen> {
   }
 
   Future<void> _save() async {
-    String? coverB64;
-    if (_coverPath != null) {
-      try {
-        final bytes = File(_coverPath!).readAsBytesSync();
-        coverB64 = base64.encode(bytes);
-      } catch (_) {}
-    }
     final meta = BookMeta(
       title: _titleCtrl.text.trim(),
       author: _authorCtrl.text.trim(),
       narrator: _narratorCtrl.text.trim(),
-      coverFileName: _coverPath?.split(Platform.pathSeparator).last ?? '',
-      coverBase64: coverB64 ?? '',
+      cover: _coverPath?.split(Platform.pathSeparator).last ?? '',
       description: _descCtrl.text.trim(),
     );
-    // Save to DB (works on all platforms)
-    widget.db?.setMeta(widget.group.folderKey, meta);
-    // Also try file system (silent fail if not available)
-    try { await MetadataManager.write(widget.group.folderPath, meta); } catch (_) {}
+    await MetadataManager.write(widget.group.folderPath, meta);
     widget.group.refreshMeta();
     if (mounted) Navigator.pop(context);
   }
@@ -147,7 +132,9 @@ class _MetaEditScreenState extends State<MetaEditScreen> {
                   height: 160,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(8),
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                     image: _coverPath != null
                         ? DecorationImage(
                             image: FileImage(File(_coverPath!)),
@@ -166,22 +153,34 @@ class _MetaEditScreenState extends State<MetaEditScreen> {
             const SizedBox(height: 16),
             TextField(
               controller: _titleCtrl,
-              decoration: const InputDecoration(labelText: '书名', border: OutlineInputBorder()),
+              decoration: const InputDecoration(
+                labelText: '书名',
+                border: OutlineInputBorder(),
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _authorCtrl,
-              decoration: const InputDecoration(labelText: '作者', border: OutlineInputBorder()),
+              decoration: const InputDecoration(
+                labelText: '作者',
+                border: OutlineInputBorder(),
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _narratorCtrl,
-              decoration: const InputDecoration(labelText: '演播者', border: OutlineInputBorder()),
+              decoration: const InputDecoration(
+                labelText: '演播者',
+                border: OutlineInputBorder(),
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _descCtrl,
-              decoration: const InputDecoration(labelText: '简介', border: OutlineInputBorder()),
+              decoration: const InputDecoration(
+                labelText: '简介',
+                border: OutlineInputBorder(),
+              ),
               maxLines: 3,
             ),
             const SizedBox(height: 24),
