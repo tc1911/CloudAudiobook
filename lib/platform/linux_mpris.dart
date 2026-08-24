@@ -144,7 +144,46 @@ class _MprisPlayer extends DBusObject {
 
   @override
   List<DBusIntrospectInterface> introspect() => [
-    DBusIntrospectInterface(_mprisRootInterface),
+    DBusIntrospectInterface(
+      _mprisRootInterface,
+      properties: [
+        DBusIntrospectProperty(
+          'CanQuit',
+          DBusSignature('b'),
+          access: DBusPropertyAccess.read,
+        ),
+        DBusIntrospectProperty(
+          'CanRaise',
+          DBusSignature('b'),
+          access: DBusPropertyAccess.read,
+        ),
+        DBusIntrospectProperty(
+          'HasTrackList',
+          DBusSignature('b'),
+          access: DBusPropertyAccess.read,
+        ),
+        DBusIntrospectProperty(
+          'Identity',
+          DBusSignature('s'),
+          access: DBusPropertyAccess.read,
+        ),
+        DBusIntrospectProperty(
+          'DesktopEntry',
+          DBusSignature('s'),
+          access: DBusPropertyAccess.read,
+        ),
+        DBusIntrospectProperty(
+          'SupportedUriSchemes',
+          DBusSignature('as'),
+          access: DBusPropertyAccess.read,
+        ),
+        DBusIntrospectProperty(
+          'SupportedMimeTypes',
+          DBusSignature('as'),
+          access: DBusPropertyAccess.read,
+        ),
+      ],
+    ),
     DBusIntrospectInterface(
       _mprisPlayerInterface,
       methods: [
@@ -152,15 +191,22 @@ class _MprisPlayer extends DBusObject {
           DBusIntrospectMethod(name),
       ],
       properties: [
-        DBusIntrospectProperty('PlaybackStatus', DBusSignature('s')),
-        DBusIntrospectProperty('Metadata', DBusSignature('a{sv}')),
-        DBusIntrospectProperty('Position', DBusSignature('x')),
-        DBusIntrospectProperty('CanGoNext', DBusSignature('b')),
-        DBusIntrospectProperty('CanGoPrevious', DBusSignature('b')),
-        DBusIntrospectProperty('CanPlay', DBusSignature('b')),
-        DBusIntrospectProperty('CanPause', DBusSignature('b')),
-        DBusIntrospectProperty('CanSeek', DBusSignature('b')),
-        DBusIntrospectProperty('CanControl', DBusSignature('b')),
+        for (final property in {
+          'PlaybackStatus': 's',
+          'Metadata': 'a{sv}',
+          'Position': 'x',
+          'CanGoNext': 'b',
+          'CanGoPrevious': 'b',
+          'CanPlay': 'b',
+          'CanPause': 'b',
+          'CanSeek': 'b',
+          'CanControl': 'b',
+        }.entries)
+          DBusIntrospectProperty(
+            property.key,
+            DBusSignature(property.value),
+            access: DBusPropertyAccess.read,
+          ),
       ],
     ),
   ];
