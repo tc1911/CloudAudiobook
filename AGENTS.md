@@ -22,6 +22,7 @@
 - Windows wrapper: `scripts\build.bat [windows|android|all] [debug|profile|release]`; it supports Windows and Android only and also writes to the sibling `..\app` directory.
 - The shell `all` path attempts Windows and Android before Linux; use a platform-specific argument when the host/toolchain cannot build every target.
 - Windows builds download the media_kit mpv archive into `build/windows/x64/` if absent. Linux packaging downloads `appimagetool-x86_64.AppImage` into the repository and produces AppImage, `.deb`, `.rpm`, and Arch `.pkg.tar.zst` artifacts; `dpkg-deb`, `rpmbuild`, and `makepkg` are optional host tools and missing ones are skipped.
+- Linux tray builds require the Ayatana AppIndicator development package (`libayatana-appindicator3-dev` on Ubuntu, `libayatana-appindicator` on Arch).
 - Android release signing uses ignored `android/key.properties` and its referenced keystore when present; otherwise the Gradle config falls back to the debug signing key.
 
 ## Generated Files

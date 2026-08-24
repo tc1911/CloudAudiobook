@@ -171,7 +171,7 @@ Architecture: amd64
 Maintainer: CloudAudiobook
 Description: Private audiobook library and player
  CloudAudiobook plays audiobooks from local, WebDAV, and SMB sources.
-Depends: libgtk-3-0, libmpv2
+Depends: libgtk-3-0, libmpv2, libayatana-appindicator3-1
 CONTROL
         local deb_output="$dest/${package_name}_${version}_${revision}_amd64.deb"
         dpkg-deb --build --root-owner-group "$deb_root" "$deb_output" >/dev/null
@@ -194,6 +194,7 @@ License: MIT
 BuildArch: x86_64
 Requires: gtk3
 Requires: mpv-libs
+Requires: libayatana-appindicator-gtk3
 
 %description
 CloudAudiobook plays audiobooks from local, WebDAV, and SMB sources.
@@ -235,7 +236,7 @@ pkgrel=$revision
 pkgdesc='Private audiobook library and player'
 arch=('x86_64')
 license=('MIT')
-depends=('gtk3' 'mpv')
+depends=('gtk3' 'mpv' 'libayatana-appindicator')
 source=()
 sha256sums=()
 

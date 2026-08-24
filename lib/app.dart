@@ -212,12 +212,15 @@ class PlayerScreen extends StatefulWidget {
   final AudiobookCore? core;
   final dynamic bookDb;
   final void Function(String)? onTitleUpdate;
+  final void Function(bool playing, bool canGoNext, bool canGoPrevious)?
+  onPlaybackStateChanged;
   const PlayerScreen({
     super.key,
     required this.initialPositionMs,
     this.core,
     this.bookDb,
     this.onTitleUpdate,
+    this.onPlaybackStateChanged,
   });
 
   @override
@@ -270,6 +273,11 @@ class PlayerScreenState extends State<PlayerScreen> {
         duration: _core.duration,
         canGoNext: _playlist.length > 1,
         canGoPrevious: _playlist.length > 1,
+      );
+      widget.onPlaybackStateChanged?.call(
+        p,
+        _playlist.length > 1,
+        _playlist.length > 1,
       );
       // Auto-next when playback completes (player stops and position >= duration)
       if (!p && _playlist.length > 1 && _core.duration > Duration.zero) {
@@ -335,6 +343,11 @@ class PlayerScreenState extends State<PlayerScreen> {
     _playlist = allItems ?? [item];
     _playlistIndex = _playlist.indexWhere((i) => i.path == item.path);
     if (_playlistIndex < 0) _playlistIndex = 0;
+    widget.onPlaybackStateChanged?.call(
+      _isPlaying,
+      _playlist.length > 1,
+      _playlist.length > 1,
+    );
     _selectSourceItem(item, source, resumeMs: resumeMs, autoPlay: autoPlay);
     // Scroll playlist to current item
     WidgetsBinding.instance.addPostFrameCallback((_) {

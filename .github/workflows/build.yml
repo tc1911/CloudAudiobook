@@ -98,7 +98,7 @@ jobs:
       - name: Install Linux build and package tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build pkg-config libgtk-3-dev libmpv-dev rpm zstd
+          sudo apt-get install -y cmake ninja-build pkg-config libgtk-3-dev libmpv-dev libayatana-appindicator3-dev rpm zstd
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -154,7 +154,7 @@ jobs:
           Priority: optional
           Architecture: amd64
           Maintainer: CloudAudiobook
-          Depends: libgtk-3-0, libmpv2
+          Depends: libgtk-3-0, libmpv2, libayatana-appindicator3-1
           Description: Private audiobook library and player
            CloudAudiobook plays audiobooks from local, WebDAV, and SMB sources.
           CONTROL
@@ -172,6 +172,7 @@ jobs:
           BuildArch: x86_64
           Requires: gtk3
           Requires: mpv-libs
+          Requires: libayatana-appindicator-gtk3
 
           %description
           CloudAudiobook plays audiobooks from local, WebDAV, and SMB sources.
@@ -209,6 +210,7 @@ jobs:
           license = MIT
           depend = gtk3
           depend = mpv
+          depend = libayatana-appindicator
           PKGINFO
           tar --zstd --format=gnu --owner=0 --group=0 --numeric-owner \
             -C "$arch_root" \

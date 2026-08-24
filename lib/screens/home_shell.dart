@@ -42,7 +42,21 @@ class _HomeShellState extends State<HomeShell> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _autoResume();
       _autoSync();
-      _platformIntegration.init();
+      _platformIntegration.init(
+        onPlay: () async {
+          await _playerKey.currentState?.forcePlay();
+        },
+        onPause: () async {
+          await _playerKey.currentState?.forcePause();
+        },
+        onNext: () async => _playerKey.currentState?.callPlayNext?.call(),
+        onPrevious: () async => _playerKey.currentState?.callPlayPrev?.call(),
+        onExit: () async {
+          await _core.saveNow();
+          await LinuxMpris().dispose();
+          _syncManager.dispose();
+        },
+      );
       LinuxMpris().initialize(
         onPlay: () async {
           await _playerKey.currentState?.forcePlay();
@@ -236,6 +250,13 @@ class _HomeShellState extends State<HomeShell> {
           core: _core,
           bookDb: widget.bookDb,
           onTitleUpdate: (title) => _platformIntegration.updateTitle(title),
+          onPlaybackStateChanged: (playing, canGoNext, canGoPrevious) {
+            _platformIntegration.updatePlaybackState(
+              playing: playing,
+              canGoNext: canGoNext,
+              canGoPrevious: canGoPrevious,
+            );
+          },
         ),
         // Tab 2: Bookshelf
         BookshelfScreen(

@@ -13,6 +13,7 @@
 - 定时暂停
 - 数据同步（WebDAV 协议跨设备同步）
 - Android 锁屏/通知栏媒体控制
+- Windows / Linux 系统托盘（关闭窗口后继续播放）
 - Material Design 3 暗色主题
 
 ## 平台支持
