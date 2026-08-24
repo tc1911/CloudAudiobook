@@ -1,7 +1,7 @@
+import 'dart:developer' as developer;
 import 'dart:io' show Platform;
 
 import 'package:dbus/dbus.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
 
 typedef MediaCommand = Future<void> Function();
 
@@ -44,7 +44,7 @@ class LinuxMpris {
       _client = client;
       _player = player;
     } catch (e) {
-      debugPrint('[MPRIS] initialize error: $e');
+      developer.log('initialize error', name: 'MPRIS', error: e);
     }
   }
 
@@ -128,19 +128,50 @@ class _MprisPlayer extends DBusObject {
   }
 
   Map<String, DBusValue> changedProperties() => {
-    'PlaybackStatus': DBusString(playing ? 'Playing' : 'Paused'),
+    'PlaybackStatus': DBusString(_playbackStatus),
     'Position': DBusInt64(position.inMicroseconds),
     'CanGoNext': DBusBoolean(canGoNext),
     'CanGoPrevious': DBusBoolean(canGoPrevious),
+    'CanPlay': DBusBoolean(title.isNotEmpty),
+    'CanPause': DBusBoolean(title.isNotEmpty),
+    'CanSeek': DBusBoolean(false),
+    'CanControl': DBusBoolean(true),
     'Metadata': _metadata,
   };
 
+  String get _playbackStatus {
+    if (title.isEmpty) return 'Stopped';
+    return playing ? 'Playing' : 'Paused';
+  }
+
   DBusDict get _metadata => DBusDict.stringVariant({
     'mpris:trackid': DBusObjectPath('/org/mpris/MediaPlayer2/Track/1'),
-    'xesam:title': DBusArray.string([title]),
+    'xesam:title': DBusString(title),
     'xesam:artist': DBusArray.string([artist]),
     'mpris:length': DBusInt64(duration.inMicroseconds),
   });
+
+  Map<String, DBusValue> get _rootProperties => {
+    'CanQuit': DBusBoolean(true),
+    'CanRaise': DBusBoolean(true),
+    'HasTrackList': DBusBoolean(false),
+    'Identity': DBusString('云听书'),
+    'DesktopEntry': DBusString('cloud-audiobook'),
+    'SupportedUriSchemes': DBusArray.string([]),
+    'SupportedMimeTypes': DBusArray.string([]),
+  };
+
+  Map<String, DBusValue> get _playerProperties => {
+    'PlaybackStatus': DBusString(_playbackStatus),
+    'Metadata': _metadata,
+    'Position': DBusInt64(position.inMicroseconds),
+    'CanGoNext': DBusBoolean(canGoNext),
+    'CanGoPrevious': DBusBoolean(canGoPrevious),
+    'CanPlay': DBusBoolean(title.isNotEmpty),
+    'CanPause': DBusBoolean(title.isNotEmpty),
+    'CanSeek': DBusBoolean(false),
+    'CanControl': DBusBoolean(true),
+  };
 
   @override
   List<DBusIntrospectInterface> introspect() => [
@@ -234,31 +265,22 @@ class _MprisPlayer extends DBusObject {
   @override
   Future<DBusMethodResponse> getProperty(String interface, String name) async {
     if (interface == _mprisRootInterface) {
-      final value = <String, DBusValue>{
-        'CanQuit': DBusBoolean(true),
-        'CanRaise': DBusBoolean(true),
-        'HasTrackList': DBusBoolean(false),
-        'Identity': DBusString('云听书'),
-        'DesktopEntry': DBusString('cloud-audiobook'),
-        'SupportedUriSchemes': DBusArray.string([]),
-        'SupportedMimeTypes': DBusArray.string([]),
-      }[name];
+      final value = _rootProperties[name];
       if (value != null) return DBusGetPropertyResponse(value);
     }
     if (interface == _mprisPlayerInterface) {
-      final value = <String, DBusValue>{
-        'PlaybackStatus': DBusString(playing ? 'Playing' : 'Paused'),
-        'Metadata': _metadata,
-        'Position': DBusInt64(position.inMicroseconds),
-        'CanGoNext': DBusBoolean(canGoNext),
-        'CanGoPrevious': DBusBoolean(canGoPrevious),
-        'CanPlay': DBusBoolean(title.isNotEmpty),
-        'CanPause': DBusBoolean(playing),
-        'CanSeek': DBusBoolean(true),
-        'CanControl': DBusBoolean(true),
-      }[name];
+      final value = _playerProperties[name];
       if (value != null) return DBusGetPropertyResponse(value);
     }
     return DBusGetPropertyResponse(DBusString(''));
+  }
+
+  @override
+  Future<DBusMethodResponse> getAllProperties(String interface) async {
+    return DBusGetAllPropertiesResponse(switch (interface) {
+      _mprisRootInterface => _rootProperties,
+      _mprisPlayerInterface => _playerProperties,
+      _ => const {},
+    });
   }
 }

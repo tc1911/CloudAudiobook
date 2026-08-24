@@ -44,8 +44,12 @@ class _HomeShellState extends State<HomeShell> {
       _autoSync();
       _platformIntegration.init();
       LinuxMpris().initialize(
-        onPlay: () async => _playerKey.currentState?.forcePlay(),
-        onPause: () async => _playerKey.currentState?.forcePause(),
+        onPlay: () async {
+          await _playerKey.currentState?.forcePlay();
+        },
+        onPause: () async {
+          await _playerKey.currentState?.forcePause();
+        },
         onNext: () async => _playerKey.currentState?.callPlayNext?.call(),
         onPrevious: () async => _playerKey.currentState?.callPlayPrev?.call(),
       );

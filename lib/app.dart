@@ -295,20 +295,18 @@ class PlayerScreenState extends State<PlayerScreen> {
     return '$h:$mm:$ss';
   }
 
-  void forcePlay() {
-    _core.play();
-    _isPlaying = true;
-    setState(() {});
+  Future<void> forcePlay() async {
+    if (!_sourceLoaded) return;
+    await _core.play();
   }
 
-  void forcePause() {
-    _core.pause();
-    _isPlaying = false;
-    setState(() {});
+  Future<void> forcePause() async {
+    if (!_sourceLoaded) return;
+    await _core.pause();
   }
 
   Future<void> togglePlay() async {
-    _togglePlay();
+    await _togglePlay();
   }
 
   Future<void> _togglePlay() async {
