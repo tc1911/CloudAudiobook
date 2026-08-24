@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:xml/xml.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
+import 'metadata.dart';
 
 /// Natural sort: "第2集" before "第10集", handles numbers in filenames
 int _naturalCompare(String a, String b) {
@@ -130,6 +132,87 @@ class WebdavSource extends BookSource {
         : config.host;
     final p = path.startsWith('/') ? path : '/$path';
     return '$host$p';
+  }
+
+  Future<BookMeta?> readMetadata(String folderPath) async {
+    final response = await httpClient.get(
+      Uri.parse(url('$folderPath/.BookInformation/metadata.json')),
+      headers: {'Authorization': authHeader()},
+    );
+    if (response.statusCode == 404) return null;
+    if (response.statusCode >= 400) {
+      throw Exception('WebDAV metadata error ${response.statusCode}');
+    }
+    try {
+      return BookMeta.fromJson(
+        jsonDecode(response.body) as Map<String, dynamic>,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> writeMetadata(String folderPath, BookMeta meta) async {
+    await _ensureMetadataDir(folderPath);
+    final response = await httpClient.put(
+      Uri.parse(url('$folderPath/.BookInformation/metadata.json')),
+      headers: {
+        'Authorization': authHeader(),
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(meta.toJson()),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception('WebDAV metadata write error ${response.statusCode}');
+    }
+  }
+
+  Future<String?> cacheMetadataCover(
+    String folderPath,
+    String coverName,
+  ) async {
+    final response = await httpClient.get(
+      Uri.parse(url('$folderPath/.BookInformation/$coverName')),
+      headers: {'Authorization': authHeader()},
+    );
+    if (response.statusCode >= 400) return null;
+    final dir = await getTemporaryDirectory();
+    final key = base64Url
+        .encode(utf8.encode('$name:$folderPath:$coverName'))
+        .replaceAll('=', '');
+    final file = File('${dir.path}/cloud_audiobook_webdav_$key');
+    await file.writeAsBytes(response.bodyBytes);
+    return file.path;
+  }
+
+  Future<void> writeMetadataCover(
+    String folderPath,
+    String coverName,
+    List<int> bytes,
+  ) async {
+    await _ensureMetadataDir(folderPath);
+    final response = await httpClient.put(
+      Uri.parse(url('$folderPath/.BookInformation/$coverName')),
+      headers: {
+        'Authorization': authHeader(),
+        'Content-Type': 'application/octet-stream',
+      },
+      body: bytes,
+    );
+    if (response.statusCode >= 400) {
+      throw Exception('WebDAV cover write error ${response.statusCode}');
+    }
+  }
+
+  Future<void> _ensureMetadataDir(String folderPath) async {
+    final client = httpClient;
+    final response = await client.send(
+      http.Request('MKCOL', Uri.parse(url('$folderPath/.BookInformation')))
+        ..headers['Authorization'] = authHeader(),
+    );
+    if (response.statusCode >= 400 && response.statusCode != 405) {
+      throw Exception('WebDAV metadata directory error ${response.statusCode}');
+    }
   }
 
   @override

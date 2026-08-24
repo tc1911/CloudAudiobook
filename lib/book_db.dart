@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'metadata.dart';
+import 'source.dart';
 
 class BookRecord {
   String id;
@@ -199,6 +200,7 @@ class BookGroup {
 
   BookMeta? _metaCache;
   bool? _metaExistsCache;
+  String? _remoteCoverPath;
 
   bool get hasMeta {
     if (_metaExistsCache != null) return _metaExistsCache!;
@@ -209,6 +211,20 @@ class BookGroup {
   void refreshMeta() {
     _metaCache = null;
     _metaExistsCache = null;
+  }
+
+  Future<void> loadRemoteMetadata(BookSource source) async {
+    if (source is! WebdavSource) return;
+    final meta = await source.readMetadata(folderPath);
+    if (meta == null) return;
+    _metaCache = meta;
+    _metaExistsCache = true;
+    if (meta.cover.isNotEmpty) {
+      _remoteCoverPath = await source.cacheMetadataCover(
+        folderPath,
+        meta.cover,
+      );
+    }
   }
 
   BookMeta get meta {
@@ -241,6 +257,7 @@ class BookGroup {
   String get narrator => meta.narrator;
   String? get coverPath {
     if (kIsWeb) return null;
+    if (_remoteCoverPath != null) return _remoteCoverPath;
     // Try file-based (.BookInformation/cover.*)
     final fileCover = MetadataManager.coverPath(folderPath);
     if (fileCover != null) return fileCover;
