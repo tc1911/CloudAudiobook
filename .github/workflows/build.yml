@@ -132,6 +132,7 @@ jobs:
           cp "$bundle/lib/"*.so "$root/usr/lib/cloud-audiobook/lib/"
           printf '%s\n' '#!/bin/sh' \
             'HERE=/usr/lib/cloud-audiobook' \
+            'export LC_ALL=C' \
             'export LD_LIBRARY_PATH="$HERE/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"' \
             'exec "$HERE/cloud_audiobook" "$@"' \
             > "$root/usr/bin/cloud-audiobook"
