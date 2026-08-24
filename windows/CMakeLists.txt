@@ -57,6 +57,16 @@ add_subdirectory("runner")
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+# flutter_media_session 2.x still enables MSVC's legacy /await coroutine mode.
+# Newer Visual Studio STL releases require this opt-in suppression while the
+# plugin transitions to standard C++20 coroutines.
+if(TARGET flutter_media_session_plugin)
+  target_compile_definitions(
+    flutter_media_session_plugin PRIVATE
+    _SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS
+  )
+endif()
+
 
 # === Installation ===
 # Support files are copied into place next to the executable, so that it can
