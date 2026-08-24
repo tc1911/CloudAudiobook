@@ -209,14 +209,20 @@ jobs:
           }
           PKGBUILD
           sed -i "s/__VERSION__/$version/; s/__REVISION__/$revision/" "$output/arch-work/PKGBUILD"
-          docker run --rm -v "$output:/workspace" archlinux:latest bash -euxo pipefail -c '
+          docker run --rm \
+            -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+            -v "$output:/workspace" archlinux:latest bash -euxo pipefail -c '
             pacman -Sy --noconfirm base-devel
-            useradd -m builder
+            groupadd --gid "$HOST_GID" builder
+            useradd --uid "$HOST_UID" --gid "$HOST_GID" --create-home builder
             chown -R builder:builder /workspace
             su builder -c "cd /workspace/arch-work && makepkg --force --nodeps"
           '
-          sudo chown -R "$(id -u):$(id -g)" "$output"
-          cp "$output/arch-work/cloud-audiobook-${version}-${revision}-x86_64.pkg.tar.zst" "$output/"
+          arch_package="$(find "$output/arch-work" -maxdepth 1 -type f \
+            -name 'cloud-audiobook-*.pkg.tar.zst' \
+            ! -name '*-debug-*' -print -quit)"
+          test -n "$arch_package"
+          cp "$arch_package" "$output/"
           rm -rf "$output/arch-root" "$output/arch-work"
 
           appdir="$RUNNER_TEMP/CloudAudiobook.AppDir"
