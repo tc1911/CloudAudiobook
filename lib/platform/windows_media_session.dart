@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter_media_session/flutter_media_session.dart';
-import 'package:flutter_media_session/flutter_media_session_platform_interface.dart';
 
 typedef WindowsMediaCommand = Future<void> Function();
 
@@ -24,6 +23,10 @@ class WindowsMediaSession {
   }) async {
     if (!Platform.isWindows || _active) return;
     try {
+      await _session.setWindowsAppUserModelId(
+        'tc1911.CloudAudiobook',
+        displayName: '云听书',
+      );
       await _session.activate();
       _session.setActionHandler(
         onPlay: () => unawaited(onPlay()),
@@ -45,7 +48,7 @@ class WindowsMediaSession {
     required Duration duration,
   }) async {
     if (!_active) return;
-    await _sessionPlatformUpdateMetadata(
+    await _session.updateMetadata(
       MediaMetadata(title: title, artist: artist, duration: duration),
     );
   }
@@ -55,20 +58,12 @@ class WindowsMediaSession {
     required Duration position,
   }) async {
     if (!_active) return;
-    await _sessionPlatformUpdateState(
+    await _session.updatePlaybackState(
       PlaybackState(
         status: playing ? PlaybackStatus.playing : PlaybackStatus.paused,
         position: position,
       ),
     );
-  }
-
-  Future<void> _sessionPlatformUpdateMetadata(MediaMetadata metadata) {
-    return FlutterMediaSessionPlatform.instance.updateMetadata(metadata);
-  }
-
-  Future<void> _sessionPlatformUpdateState(PlaybackState state) {
-    return FlutterMediaSessionPlatform.instance.updatePlaybackState(state);
   }
 
   Future<void> dispose() async {
