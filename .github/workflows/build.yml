@@ -215,7 +215,8 @@ jobs:
             chown -R builder:builder /workspace
             su builder -c "cd /workspace/arch-work && makepkg --force --nodeps"
           '
-          cp "$output/arch-work/"*.pkg.tar.zst "$output/"
+          sudo chown -R "$(id -u):$(id -g)" "$output"
+          cp "$output/arch-work/cloud-audiobook-${version}-${revision}-x86_64.pkg.tar.zst" "$output/"
           rm -rf "$output/arch-root" "$output/arch-work"
 
           appdir="$RUNNER_TEMP/CloudAudiobook.AppDir"
