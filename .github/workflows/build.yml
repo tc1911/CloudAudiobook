@@ -112,7 +112,7 @@ jobs:
       - name: Package Linux artifacts
         shell: bash
         run: |
-          set -euo pipefail
+          set -euxo pipefail
           raw_version="$(awk '/^version:/ {print $2; exit}' pubspec.yaml)"
           version="${raw_version%%+*}"
           revision="${raw_version#*+}"
@@ -239,7 +239,7 @@ jobs:
             -o "$appimage_tool" \
             https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x "$appimage_tool"
-          ARCH=x86_64 "$appimage_tool" "$appdir" \
+          APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 "$appimage_tool" "$appdir" \
             "$output/cloud-audiobook-v${version}-x86_64.AppImage"
 
           cp "$bundle/cloud_audiobook" "$output/cloud-audiobook-linux-bundle"
