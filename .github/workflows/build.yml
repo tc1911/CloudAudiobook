@@ -212,7 +212,8 @@ jobs:
           PKGINFO
           tar --zstd --format=gnu --owner=0 --group=0 --numeric-owner \
             -C "$arch_root" \
-            -cf "$output/cloud-audiobook-${version}-${revision}-x86_64.pkg.tar.zst" .
+            -cf "$output/cloud-audiobook-${version}-${revision}-x86_64.pkg.tar.zst" \
+            .PKGINFO usr
           test -s "$output/cloud-audiobook-${version}-${revision}-x86_64.pkg.tar.zst"
 
           appdir="$RUNNER_TEMP/CloudAudiobook.AppDir"
@@ -242,7 +243,7 @@ jobs:
           APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 "$appimage_tool" "$appdir" \
             "$output/cloud-audiobook-v${version}-x86_64.AppImage"
 
-          cp "$bundle/cloud_audiobook" "$output/cloud-audiobook-linux-bundle"
+          tar -C "$bundle" -czf "$output/cloud-audiobook-linux-bundle.tar.gz" .
           ls -lh "$output"
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
