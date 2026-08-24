@@ -77,7 +77,9 @@ build_linux() {
     local package_name="cloud-audiobook"
     local version="${VERSION_RAW%%+*}"
     local revision="${VERSION_RAW#*+}"
-    [ "$revision" = "$VERSION_RAW" ] && revision=1
+    [ "$revision" = "$VERSION_RAW" ] && revision=""
+    local version_suffix=""
+    [ -n "$revision" ] && version_suffix="_$revision"
     local dest="$BUILD_APPS_DIR/${MODE^}/linux"
 
     rm -rf "$package_root" "$package_work"
@@ -173,7 +175,7 @@ Description: Private audiobook library and player
  CloudAudiobook plays audiobooks from local, WebDAV, and SMB sources.
 Depends: libgtk-3-0, libmpv2, libayatana-appindicator3-1
 CONTROL
-        local deb_output="$dest/${package_name}_${version}_${revision}_amd64.deb"
+        local deb_output="$dest/${package_name}_${version}${version_suffix}_amd64.deb"
         dpkg-deb --build --root-owner-group "$deb_root" "$deb_output" >/dev/null
         echo "[Linux] Debian 完成 → $deb_output"
     else
@@ -188,7 +190,7 @@ CONTROL
         cat > "$rpm_top/SPECS/$package_name.spec" << SPEC
 Name: $package_name
 Version: $version
-Release: $revision
+Release: ${revision:-1}
 Summary: Private audiobook library and player
 License: MIT
 BuildArch: x86_64
@@ -232,7 +234,7 @@ SPEC
         cat > "$arch_work/PKGBUILD" << PKGBUILD
 pkgname=$package_name
 pkgver=$version
-pkgrel=$revision
+pkgrel=${revision:-1}
 pkgdesc='Private audiobook library and player'
 arch=('x86_64')
 license=('MIT')
@@ -245,7 +247,7 @@ package() {
 }
 PKGBUILD
         (cd "$arch_work" && makepkg --force --nodeps >/dev/null)
-        cp "$arch_work/${package_name}-${version}-${revision}-"*.pkg.tar.zst "$dest/"
+        cp "$arch_work/${package_name}-${version}-${revision:-1}-"*.pkg.tar.zst "$dest/"
         echo "[Linux] Arch 完成 → $dest"
     else
         echo "[跳过] 未找到 makepkg，无法生成 .pkg.tar.zst"

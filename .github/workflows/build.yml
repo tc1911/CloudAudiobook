@@ -116,7 +116,9 @@ jobs:
           raw_version="$(awk '/^version:/ {print $2; exit}' pubspec.yaml)"
           version="${raw_version%%+*}"
           revision="${raw_version#*+}"
-          [[ "$revision" == "$raw_version" ]] && revision=1
+          [[ "$revision" == "$raw_version" ]] && revision=""
+          version_suffix=""
+          [[ -n "$revision" ]] && version_suffix="_$revision"
           bundle="build/linux/x64/release/bundle"
           root="$RUNNER_TEMP/cloud-audiobook-root"
           output="$RUNNER_TEMP/cloud-audiobook-output"
@@ -143,7 +145,7 @@ jobs:
           cp web/icons/Icon-512.png \
             "$root/usr/share/icons/hicolor/512x512/apps/cloud-audiobook.png"
 
-          deb="$output/cloud-audiobook_${version}_${revision}_amd64.deb"
+          deb="$output/cloud-audiobook_${version}${version_suffix}_amd64.deb"
           deb_root="$RUNNER_TEMP/cloud-audiobook-deb"
           mkdir -p "$deb_root/DEBIAN"
           cp -a "$root/." "$deb_root/"
@@ -166,7 +168,7 @@ jobs:
           cat > "$rpm_top/SPECS/cloud-audiobook.spec" <<SPEC
           Name: cloud-audiobook
           Version: $version
-          Release: $revision
+          Release: ${revision:-1}
           Summary: Private audiobook library and player
           License: MIT
           BuildArch: x86_64
@@ -200,7 +202,7 @@ jobs:
           cat > "$arch_root/.PKGINFO" <<PKGINFO
           pkgname = cloud-audiobook
           pkgbase = cloud-audiobook
-          pkgver = ${version}-${revision}
+          pkgver = ${version}-${revision:-1}
           pkgdesc = Private audiobook library and player
           url = https://github.com/tc1911/CloudAudiobook
           builddate = $(date +%s)
@@ -214,9 +216,9 @@ jobs:
           PKGINFO
           tar --zstd --format=gnu --owner=0 --group=0 --numeric-owner \
             -C "$arch_root" \
-            -cf "$output/cloud-audiobook-${version}-${revision}-x86_64.pkg.tar.zst" \
+            -cf "$output/cloud-audiobook-${version}-${revision:-1}-x86_64.pkg.tar.zst" \
             .PKGINFO usr
-          test -s "$output/cloud-audiobook-${version}-${revision}-x86_64.pkg.tar.zst"
+          test -s "$output/cloud-audiobook-${version}-${revision:-1}-x86_64.pkg.tar.zst"
 
           appdir="$RUNNER_TEMP/CloudAudiobook.AppDir"
           mkdir -p "$appdir/usr/bin/data" "$appdir/usr/bin/lib"
