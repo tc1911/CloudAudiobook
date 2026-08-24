@@ -237,6 +237,9 @@ class PlayerScreenState extends State<PlayerScreen> {
   String _currentTitle = '';
 
   Timer? _sleepTimer;
+  StreamSubscription<Duration>? _positionSubscription;
+  StreamSubscription<Duration>? _durationSubscription;
+  StreamSubscription<bool>? _playingSubscription;
   int? _sleepSecondsLeft;
   static const _sleepOptions = [15, 30, 60]; // seconds, for debug
 
@@ -256,12 +259,23 @@ class PlayerScreenState extends State<PlayerScreen> {
         );
       }
     };
-    _core.positionStream.listen((p) {
+    _positionSubscription = _core.positionStream.listen((p) {
       setState(() => _position = p);
       LinuxMpris().updatePosition(p);
     });
-    _core.durationStream.listen((d) => setState(() => _duration = d));
-    _core.playingStream.listen((p) {
+    _durationSubscription = _core.durationStream.listen((d) {
+      setState(() => _duration = d);
+      LinuxMpris().update(
+        title: _currentTitle,
+        artist: currentSource?.name ?? '',
+        playing: _isPlaying,
+        position: _core.position,
+        duration: d,
+        canGoNext: _playlist.length > 1,
+        canGoPrevious: _playlist.length > 1,
+      );
+    });
+    _playingSubscription = _core.playingStream.listen((p) {
       setState(() => _isPlaying = p);
       MediaControl().updatePlaybackState(
         playing: p,
@@ -294,6 +308,9 @@ class PlayerScreenState extends State<PlayerScreen> {
 
   @override
   void dispose() {
+    _positionSubscription?.cancel();
+    _durationSubscription?.cancel();
+    _playingSubscription?.cancel();
     if (widget.core == null) {
       _core.dispose();
     }

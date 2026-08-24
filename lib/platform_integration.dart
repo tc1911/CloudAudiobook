@@ -18,6 +18,7 @@ class PlatformIntegration with WindowListener, TrayListener {
   bool _canGoNext = false;
   bool _canGoPrevious = false;
   bool _closeToTray = true;
+  bool _trayReady = false;
   bool _exiting = false;
 
   Future<void> init({
@@ -38,18 +39,24 @@ class PlatformIntegration with WindowListener, TrayListener {
     _closeToTray = prefs.getBool('cloud_audiobook_close_to_tray') ?? true;
 
     await windowManager.ensureInitialized();
-    trayManager.addListener(this);
-
-    final iconPath = _trayIconPath();
-    if (iconPath != null) {
+    try {
+      trayManager.addListener(this);
+      final iconPath = _trayIconPath();
+      if (iconPath == null) {
+        throw StateError('托盘图标不存在');
+      }
       await trayManager.setIcon(iconPath);
-    } else {
-      debugPrint('[Tray] icon not found; tray may be unavailable');
+      if (!Platform.isLinux) {
+        await trayManager.setToolTip('云听书');
+      }
+      _trayReady = true;
+      await _updateTrayMenu();
+    } catch (e) {
+      _trayReady = false;
+      _closeToTray = false;
+      trayManager.removeListener(this);
+      debugPrint('[Tray] disabled: $e');
     }
-    if (!Platform.isLinux) {
-      await trayManager.setToolTip('云听书');
-    }
-    await _updateTrayMenu();
     await windowManager.setPreventClose(true);
     windowManager.addListener(this);
 
@@ -125,6 +132,7 @@ class PlatformIntegration with WindowListener, TrayListener {
   }
 
   Future<void> _updateTrayMenu() async {
+    if (!_trayReady) return;
     await trayManager.setContextMenu(
       Menu(
         items: [
@@ -196,8 +204,10 @@ class PlatformIntegration with WindowListener, TrayListener {
     _exiting = true;
     await _onExit?.call();
     windowManager.removeListener(this);
-    trayManager.removeListener(this);
-    await trayManager.destroy();
+    if (_trayReady) {
+      trayManager.removeListener(this);
+      await trayManager.destroy();
+    }
     await windowManager.setPreventClose(false);
     await windowManager.destroy();
     exit(0);
@@ -205,7 +215,9 @@ class PlatformIntegration with WindowListener, TrayListener {
 
   Future<void> dispose() async {
     windowManager.removeListener(this);
-    trayManager.removeListener(this);
-    await trayManager.destroy();
+    if (_trayReady) {
+      trayManager.removeListener(this);
+      await trayManager.destroy();
+    }
   }
 }
