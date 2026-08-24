@@ -11,8 +11,17 @@ class SourceSelection {
 
 class SourceListScreen extends StatefulWidget {
   final SourceManager manager;
-  final void Function(BookItem item, BookSource source, List<BookItem> folderItems)? onFileSelected;
-  const SourceListScreen({super.key, required this.manager, this.onFileSelected});
+  final void Function(
+    BookItem item,
+    BookSource source,
+    List<BookItem> folderItems,
+  )?
+  onFileSelected;
+  const SourceListScreen({
+    super.key,
+    required this.manager,
+    this.onFileSelected,
+  });
 
   @override
   State<SourceListScreen> createState() => _SourceListScreenState();
@@ -22,7 +31,6 @@ class _SourceListScreenState extends State<SourceListScreen> {
   @override
   void initState() {
     super.initState();
-    widget.manager.load().then((_) => setState(() {}));
   }
 
   Future<void> _addSource() async {
@@ -32,7 +40,7 @@ class _SourceListScreenState extends State<SourceListScreen> {
     );
     if (config == null) return;
     final source = WebdavSource(config);
-    widget.manager.add(source);
+    await widget.manager.add(source);
     setState(() {});
   }
 
@@ -40,14 +48,16 @@ class _SourceListScreenState extends State<SourceListScreen> {
     final source = widget.manager.sources[index];
     final config = await Navigator.push<SourceConfig>(
       context,
-      MaterialPageRoute(builder: (_) => SourceEditScreen(existing: source.config)),
+      MaterialPageRoute(
+        builder: (_) => SourceEditScreen(existing: source.config),
+      ),
     );
     if (config == null) return;
     source.config.name = config.name;
     source.config.host = config.host;
     source.config.username = config.username;
     source.config.password = config.password;
-    widget.manager.save();
+    await widget.manager.save();
     setState(() {});
   }
 
@@ -58,10 +68,13 @@ class _SourceListScreenState extends State<SourceListScreen> {
         title: const Text('删除书源'),
         content: Text('确定要删除「${widget.manager.sources[index].name}」吗？'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
           FilledButton(
-            onPressed: () {
-              widget.manager.remove(index);
+            onPressed: () async {
+              await widget.manager.remove(index);
               Navigator.pop(ctx);
               setState(() {});
             },
@@ -95,10 +108,7 @@ class _SourceListScreenState extends State<SourceListScreen> {
     final sources = widget.manager.sources;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('书源管理'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('书源管理'), centerTitle: true),
       floatingActionButton: FloatingActionButton(
         heroTag: 'source_add',
         onPressed: _addSource,
@@ -109,11 +119,21 @@ class _SourceListScreenState extends State<SourceListScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.cloud_off_rounded, size: 64, color: cs.onSurfaceVariant),
+                  Icon(
+                    Icons.cloud_off_rounded,
+                    size: 64,
+                    color: cs.onSurfaceVariant,
+                  ),
                   const SizedBox(height: 16),
-                  Text('暂无书源', style: TextStyle(color: cs.onSurfaceVariant, fontSize: 16)),
+                  Text(
+                    '暂无书源',
+                    style: TextStyle(color: cs.onSurfaceVariant, fontSize: 16),
+                  ),
                   const SizedBox(height: 8),
-                  Text('点击右下角按钮添加', style: TextStyle(color: cs.onSurfaceVariant)),
+                  Text(
+                    '点击右下角按钮添加',
+                    style: TextStyle(color: cs.onSurfaceVariant),
+                  ),
                 ],
               ),
             )
@@ -123,17 +143,23 @@ class _SourceListScreenState extends State<SourceListScreen> {
               itemBuilder: (_, i) {
                 final s = sources[i];
                 return ListTile(
-                  leading: Icon(s.icon, color: s.enabled ? cs.primary : cs.onSurfaceVariant),
+                  leading: Icon(
+                    s.icon,
+                    color: s.enabled ? cs.primary : cs.onSurfaceVariant,
+                  ),
                   title: Text(s.name),
-                  subtitle: Text('${s.type.toUpperCase()} — ${s.config.host}',
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                  subtitle: Text(
+                    '${s.type.toUpperCase()} — ${s.config.host}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Switch(
                         value: s.enabled,
-                        onChanged: (_) {
-                          widget.manager.toggle(i);
+                        onChanged: (_) async {
+                          await widget.manager.toggle(i);
                           setState(() {});
                         },
                       ),
@@ -144,7 +170,10 @@ class _SourceListScreenState extends State<SourceListScreen> {
                         },
                         itemBuilder: (_) => [
                           const PopupMenuItem(value: 'edit', child: Text('编辑')),
-                          const PopupMenuItem(value: 'delete', child: Text('删除')),
+                          const PopupMenuItem(
+                            value: 'delete',
+                            child: Text('删除'),
+                          ),
                         ],
                       ),
                     ],

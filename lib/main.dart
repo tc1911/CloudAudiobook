@@ -4,22 +4,21 @@ import 'source.dart';
 import 'book_db.dart';
 import 'theme_manager.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   initMediaKit();
 
   final sourceManager = SourceManager();
   final bookDb = BookDatabase();
-  sourceManager.load();
-  bookDb.load();
-
   final themeManager = ThemeManager();
-  await themeManager.load();
+  await Future.wait([sourceManager.load(), bookDb.load(), themeManager.load()]);
 
-  runApp(AudiobookApp(
-    initialPositionMs: 0,
-    sourceManager: sourceManager,
-    bookDb: bookDb,
-    themeManager: themeManager,
-  ));
+  runApp(
+    AudiobookApp(
+      initialPositionMs: 0,
+      sourceManager: sourceManager,
+      bookDb: bookDb,
+      themeManager: themeManager,
+    ),
+  );
 }

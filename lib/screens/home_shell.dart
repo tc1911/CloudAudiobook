@@ -7,7 +7,6 @@ import '../theme_manager.dart';
 import '../platform_integration.dart';
 import '../platform/media_control.dart';
 import 'source_list.dart';
-import 'source_edit.dart';
 import 'bookshelf.dart';
 import 'settings.dart';
 
@@ -46,13 +45,20 @@ class _HomeShellState extends State<HomeShell> {
     });
   }
 
-  @override
   void _initMediaControl() {
     final mc = MediaControl();
-    mc.onPlay = () { _playerKey.currentState?.forcePlay(); };
-    mc.onPause = () { _playerKey.currentState?.forcePause(); };
-    mc.onNext = () { _playerKey.currentState?.callPlayNext?.call(); };
-    mc.onPrev = () { _playerKey.currentState?.callPlayPrev?.call(); };
+    mc.onPlay = () {
+      _playerKey.currentState?.forcePlay();
+    };
+    mc.onPause = () {
+      _playerKey.currentState?.forcePause();
+    };
+    mc.onNext = () {
+      _playerKey.currentState?.callPlayNext?.call();
+    };
+    mc.onPrev = () {
+      _playerKey.currentState?.callPlayPrev?.call();
+    };
   }
 
   Future<void> _autoSync() async {
@@ -70,8 +76,9 @@ class _HomeShellState extends State<HomeShell> {
 
   /// Auto-resume last played file on startup
   Future<void> _autoResume() async {
-    await widget.bookDb.load();
-    final last = widget.bookDb.history.isNotEmpty ? widget.bookDb.history.first : null;
+    final last = widget.bookDb.history.isNotEmpty
+        ? widget.bookDb.history.first
+        : null;
     if (last == null) return;
 
     final lastRec = last.lastPlayedRecord;
@@ -80,16 +87,27 @@ class _HomeShellState extends State<HomeShell> {
     // Find source
     BookSource? source;
     for (final s in widget.sourceManager.sources) {
-      if (s.name == last.sourceName) { source = s; break; }
+      if (s.name == last.sourceName) {
+        source = s;
+        break;
+      }
     }
     if (source == null) return;
 
     // Browse folder for full playlist
     try {
-      final allItems = await source.browse(last.folderKey.isEmpty ? '/' : last.folderKey);
+      final allItems = await source.browse(
+        last.folderKey.isEmpty ? '/' : last.folderKey,
+      );
       final audioItems = allItems.where((i) => !i.isFolder).toList();
       final item = BookItem(name: lastRec.title, path: lastRec.path);
-      _playerKey.currentState?.loadFromSource(item, source, allItems: audioItems, resumeMs: lastRec.positionMs, autoPlay: false);
+      _playerKey.currentState?.loadFromSource(
+        item,
+        source,
+        allItems: audioItems,
+        resumeMs: lastRec.positionMs,
+        autoPlay: false,
+      );
     } catch (_) {}
   }
 
@@ -97,8 +115,16 @@ class _HomeShellState extends State<HomeShell> {
     setState(() => _tabIndex = index);
   }
 
-  void _onFileSelected(BookItem item, BookSource source, List<BookItem> folderItems) {
-    _playerKey.currentState?.loadFromSource(item, source, allItems: folderItems);
+  void _onFileSelected(
+    BookItem item,
+    BookSource source,
+    List<BookItem> folderItems,
+  ) {
+    _playerKey.currentState?.loadFromSource(
+      item,
+      source,
+      allItems: folderItems,
+    );
     setState(() => _tabIndex = 1);
   }
 
@@ -126,10 +152,22 @@ class _HomeShellState extends State<HomeShell> {
             labelType: NavigationRailLabelType.all,
             backgroundColor: cs.surfaceContainerLow,
             destinations: const [
-              NavigationRailDestination(icon: Icon(Icons.dns_rounded), label: Text('书源')),
-              NavigationRailDestination(icon: Icon(Icons.play_circle_rounded), label: Text('播放')),
-              NavigationRailDestination(icon: Icon(Icons.library_books_rounded), label: Text('书架')),
-              NavigationRailDestination(icon: Icon(Icons.settings_rounded), label: Text('设置')),
+              NavigationRailDestination(
+                icon: Icon(Icons.dns_rounded),
+                label: Text('书源'),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.play_circle_rounded),
+                label: Text('播放'),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.library_books_rounded),
+                label: Text('书架'),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.settings_rounded),
+                label: Text('设置'),
+              ),
             ],
           ),
           const VerticalDivider(width: 1),
@@ -150,9 +188,18 @@ class _HomeShellState extends State<HomeShell> {
         onDestinationSelected: _switchToTab,
         destinations: const [
           NavigationDestination(icon: Icon(Icons.dns_rounded), label: '书源'),
-          NavigationDestination(icon: Icon(Icons.play_circle_rounded), label: '播放'),
-          NavigationDestination(icon: Icon(Icons.library_books_rounded), label: '书架'),
-          NavigationDestination(icon: Icon(Icons.settings_rounded), label: '设置'),
+          NavigationDestination(
+            icon: Icon(Icons.play_circle_rounded),
+            label: '播放',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.library_books_rounded),
+            label: '书架',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_rounded),
+            label: '设置',
+          ),
         ],
       ),
     );

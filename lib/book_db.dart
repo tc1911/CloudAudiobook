@@ -27,34 +27,34 @@ class BookRecord {
     int? lastPlayedAt,
     this.favorited = false,
     this.coverPath,
-  })  : id = id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-        lastPlayedAt = lastPlayedAt ?? DateTime.now().millisecondsSinceEpoch;
+  }) : id = id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+       lastPlayedAt = lastPlayedAt ?? DateTime.now().millisecondsSinceEpoch;
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'title': title,
-        'path': path,
-        'sourceName': sourceName,
-        'sourceType': sourceType,
-        'positionMs': positionMs,
-        'durationMs': durationMs,
-        'lastPlayedAt': lastPlayedAt,
-        'favorited': favorited,
-        'coverPath': coverPath,
-      };
+    'id': id,
+    'title': title,
+    'path': path,
+    'sourceName': sourceName,
+    'sourceType': sourceType,
+    'positionMs': positionMs,
+    'durationMs': durationMs,
+    'lastPlayedAt': lastPlayedAt,
+    'favorited': favorited,
+    'coverPath': coverPath,
+  };
 
   factory BookRecord.fromJson(Map<String, dynamic> json) => BookRecord(
-        id: json['id'] as String?,
-        title: json['title'] as String? ?? '',
-        path: json['path'] as String? ?? '',
-        sourceName: json['sourceName'] as String? ?? '',
-        sourceType: json['sourceType'] as String? ?? '',
-        positionMs: json['positionMs'] as int? ?? 0,
-        durationMs: json['durationMs'] as int? ?? 0,
-        lastPlayedAt: json['lastPlayedAt'] as int?,
-        favorited: json['favorited'] as bool? ?? false,
-        coverPath: json['coverPath'] as String?,
-      );
+    id: json['id'] as String?,
+    title: json['title'] as String? ?? '',
+    path: json['path'] as String? ?? '',
+    sourceName: json['sourceName'] as String? ?? '',
+    sourceType: json['sourceType'] as String? ?? '',
+    positionMs: json['positionMs'] as int? ?? 0,
+    durationMs: json['durationMs'] as int? ?? 0,
+    lastPlayedAt: json['lastPlayedAt'] as int?,
+    favorited: json['favorited'] as bool? ?? false,
+    coverPath: json['coverPath'] as String?,
+  );
 
   String get formattedProgress {
     if (durationMs <= 0) return '0%';
@@ -73,7 +73,9 @@ class BookDatabase {
     final json = prefs.getString(_key);
     if (json != null) {
       final list = jsonDecode(json) as List<dynamic>;
-      books = list.map((e) => BookRecord.fromJson(e as Map<String, dynamic>)).toList();
+      books = list
+          .map((e) => BookRecord.fromJson(e as Map<String, dynamic>))
+          .toList();
     }
     final metaJson = prefs.getString(_metaKey);
     if (metaJson != null) {
@@ -87,13 +89,18 @@ class BookDatabase {
 
   Future<void> save() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, jsonEncode(books.map((b) => b.toJson()).toList()));
+    await prefs.setString(
+      _key,
+      jsonEncode(books.map((b) => b.toJson()).toList()),
+    );
   }
 
   Future<void> saveMetas() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_metaKey,
-        jsonEncode(metas.map((k, v) => MapEntry(k, v.toJson()))));
+    await prefs.setString(
+      _metaKey,
+      jsonEncode(metas.map((k, v) => MapEntry(k, v.toJson()))),
+    );
   }
 
   BookMeta getMeta(String folderKey) {
@@ -186,9 +193,7 @@ class BookDatabase {
       final key = '${r.sourceName}|${folderKey(r)}';
       map.putIfAbsent(key, () => []).add(r);
     }
-    return map.entries
-        .map((e) => BookGroup(e.value))
-        .toList()
+    return map.entries.map((e) => BookGroup(e.value)).toList()
       ..sort((a, b) => b.lastPlayedAt.compareTo(a.lastPlayedAt));
   }
 
@@ -216,7 +221,6 @@ class BookGroup {
   String get folderPath {
     if (folderPathCache != null) return folderPathCache!;
     final r = records.first;
-    final sep = r.path.contains('/') ? '/' : '\\';
     folderPathCache = MetadataManager.folderPathFromFile(r.path);
     return folderPathCache!;
   }
@@ -237,7 +241,9 @@ class BookGroup {
 
   /// Bind a BookDatabase for fallback meta lookups
   static BookDatabase? _db;
-  static void bindDb(BookDatabase db) { _db = db; }
+  static void bindDb(BookDatabase db) {
+    _db = db;
+  }
 
   BookMeta get meta {
     if (_metaCache != null) return _metaCache!;
@@ -291,9 +297,11 @@ class BookGroup {
   String get folderKey => BookDatabase.folderKey(records.first);
   String get sourceName => records.first.sourceName;
   int get totalFiles => records.length;
-  int get finishedFiles => records.where((r) => r.positionMs >= r.durationMs - 10000).length;
+  int get finishedFiles =>
+      records.where((r) => r.positionMs >= r.durationMs - 10000).length;
 
-  int get lastPlayedAt => records.map((r) => r.lastPlayedAt).reduce((a, b) => a > b ? a : b);
+  int get lastPlayedAt =>
+      records.map((r) => r.lastPlayedAt).reduce((a, b) => a > b ? a : b);
 
   bool get favorited => records.any((r) => r.favorited);
 
@@ -303,7 +311,8 @@ class BookGroup {
   BookRecord? get lastPlayedRecord {
     BookRecord? latest;
     for (final r in records) {
-      if (r.positionMs > 0 && (latest == null || r.lastPlayedAt > latest.lastPlayedAt)) {
+      if (r.positionMs > 0 &&
+          (latest == null || r.lastPlayedAt > latest.lastPlayedAt)) {
         latest = r;
       }
     }
@@ -330,24 +339,4 @@ class BookGroup {
 
   /// e.g. "宿命之环 - 1-10.opus"
   String get lastEpisodeName => lastPlayedRecord?.title ?? '';
-
-  static int _naturalSort(String a, String b) {
-    final aLower = a.toLowerCase();
-    final bLower = b.toLowerCase();
-    final aParts = RegExp(r'(\d+|\D+)').allMatches(aLower).toList();
-    final bParts = RegExp(r'(\d+|\D+)').allMatches(bLower).toList();
-    for (var i = 0; i < aParts.length && i < bParts.length; i++) {
-      final aStr = aParts[i].group(0)!;
-      final bStr = bParts[i].group(0)!;
-      final aNum = int.tryParse(aStr);
-      final bNum = int.tryParse(bStr);
-      if (aNum != null && bNum != null) {
-        if (aNum != bNum) return aNum.compareTo(bNum);
-      } else {
-        final cmp = aStr.compareTo(bStr);
-        if (cmp != 0) return cmp;
-      }
-    }
-    return aParts.length.compareTo(bParts.length);
-  }
 }

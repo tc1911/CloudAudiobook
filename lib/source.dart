@@ -56,25 +56,25 @@ class SourceConfig {
     this.enabled = true,
   }) : id = id ?? DateTime.now().millisecondsSinceEpoch.toString();
 
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'type': type,
-        'host': host,
-        'username': username,
-        'password': password,
-        'enabled': enabled,
-      };
+  Map<String, dynamic> toJson({bool includeCredentials = true}) => {
+    'id': id,
+    'name': name,
+    'type': type,
+    'host': host,
+    'username': username,
+    'enabled': enabled,
+    if (includeCredentials) 'password': password,
+  };
 
   factory SourceConfig.fromJson(Map<String, dynamic> json) => SourceConfig(
-        id: json['id'] as String,
-        name: json['name'] as String? ?? '',
-        type: json['type'] as String? ?? 'webdav',
-        host: json['host'] as String? ?? '',
-        username: json['username'] as String? ?? '',
-        password: json['password'] as String? ?? '',
-        enabled: json['enabled'] as bool? ?? true,
-      );
+    id: json['id'] as String,
+    name: json['name'] as String? ?? '',
+    type: json['type'] as String? ?? 'webdav',
+    host: json['host'] as String? ?? '',
+    username: json['username'] as String? ?? '',
+    password: json['password'] as String? ?? '',
+    enabled: json['enabled'] as bool? ?? true,
+  );
 }
 
 // ─── Abstract BookSource ───
@@ -113,18 +113,21 @@ class WebdavSource extends BookSource {
 
   // helper to allow self-signed certs
   static HttpClient platformHttpClient() {
-    final hc = HttpClient()
-      ..badCertificateCallback = (_, __, ___) => true;
+    final hc = HttpClient()..badCertificateCallback = (_, __, ___) => true;
     return hc;
   }
 
   String authHeader() {
-    final creds = base64.encode(utf8.encode('${config.username}:${config.password}'));
+    final creds = base64.encode(
+      utf8.encode('${config.username}:${config.password}'),
+    );
     return 'Basic $creds';
   }
 
   String url(String path) {
-    final host = config.host.endsWith('/') ? config.host.substring(0, config.host.length - 1) : config.host;
+    final host = config.host.endsWith('/')
+        ? config.host.substring(0, config.host.length - 1)
+        : config.host;
     final p = path.startsWith('/') ? path : '/$path';
     return '$host$p';
   }
@@ -145,13 +148,15 @@ class WebdavSource extends BookSource {
   </D:prop>
 </D:propfind>''';
 
-    final response = await client.send(http.Request('PROPFIND', Uri.parse(url))
-      ..headers.addAll({
-        'Authorization': authHeader(),
-        'Depth': '1',
-        'Content-Type': 'application/xml; charset=utf-8',
-      })
-      ..bodyBytes = utf8.encode(body));
+    final response = await client.send(
+      http.Request('PROPFIND', Uri.parse(url))
+        ..headers.addAll({
+          'Authorization': authHeader(),
+          'Depth': '1',
+          'Content-Type': 'application/xml; charset=utf-8',
+        })
+        ..bodyBytes = utf8.encode(body),
+    );
 
     final responseBody = await response.stream.bytesToString();
     if (response.statusCode >= 400) {
@@ -162,22 +167,37 @@ class WebdavSource extends BookSource {
     final items = <BookItem>[];
 
     for (final responseElem in doc.findAllElements('D:response')) {
-      final href = responseElem.findElements('D:href').firstOrNull?.innerText ?? '';
-      final displayName = responseElem.findAllElements('D:displayname').firstOrNull?.innerText ?? '';
-      final isCollection = responseElem.findAllElements('D:collection').isNotEmpty;
+      final href =
+          responseElem.findElements('D:href').firstOrNull?.innerText ?? '';
+      final displayName =
+          responseElem
+              .findAllElements('D:displayname')
+              .firstOrNull
+              ?.innerText ??
+          '';
+      final isCollection = responseElem
+          .findAllElements('D:collection')
+          .isNotEmpty;
 
       // Skip the requested directory itself
       final decodedHref = Uri.decodeFull(href);
-      if (decodedHref == '/$path' || decodedHref == path || decodedHref == '/$path/' || decodedHref == '$path/') {
+      if (decodedHref == '/$path' ||
+          decodedHref == path ||
+          decodedHref == '/$path/' ||
+          decodedHref == '$path/') {
         continue;
       }
       if (displayName.isEmpty || displayName == '..') continue;
 
-      items.add(BookItem(
-        name: displayName,
-        path: decodedHref.startsWith('/') ? decodedHref.substring(1) : decodedHref,
-        isFolder: isCollection,
-      ));
+      items.add(
+        BookItem(
+          name: displayName,
+          path: decodedHref.startsWith('/')
+              ? decodedHref.substring(1)
+              : decodedHref,
+          isFolder: isCollection,
+        ),
+      );
     }
     items.sort((a, b) {
       if (a.isFolder != b.isFolder) return a.isFolder ? -1 : 1;
@@ -204,7 +224,9 @@ class SmbSource extends BookSource {
 
   @override
   Future<List<BookItem>> browse(String path) async {
-    final dirPath = path.isEmpty ? _root : '$_root\\${path.replaceAll('/', '\\')}';
+    final dirPath = path.isEmpty
+        ? _root
+        : '$_root\\${path.replaceAll('/', '\\')}';
     final dir = Directory(dirPath);
 
     if (!await dir.exists()) {
@@ -221,7 +243,16 @@ class SmbSource extends BookSource {
         items.add(BookItem(name: name, path: relPath, isFolder: true));
       } else if (entity is File) {
         final ext = name.split('.').last.toLowerCase();
-        if (['mp3', 'm4a', 'wav', 'flac', 'opus', 'ogg', 'aac', 'wma'].contains(ext)) {
+        if ([
+          'mp3',
+          'm4a',
+          'wav',
+          'flac',
+          'opus',
+          'ogg',
+          'aac',
+          'wma',
+        ].contains(ext)) {
           items.add(BookItem(name: name, path: relPath));
         }
       }
@@ -261,9 +292,9 @@ class AliyunDriveSource extends BookSource {
   }
 
   Map<String, String> get _headers => {
-        'Authorization': 'Bearer ${_accessToken ?? ''}',
-        'Content-Type': 'application/json',
-      };
+    'Authorization': 'Bearer ${_accessToken ?? ''}',
+    'Content-Type': 'application/json',
+  };
 
   @override
   IconData get icon => Icons.cloud_done_rounded;
@@ -308,7 +339,8 @@ class AliyunDriveSource extends BookSource {
   /// Step 2: List directory contents
   @override
   Future<List<BookItem>> browse(String path) async {
-    if (!await _ensureToken()) throw Exception('无法获取阿里云盘 token，请检查 refresh_token');
+    if (!await _ensureToken())
+      throw Exception('无法获取阿里云盘 token，请检查 refresh_token');
     final client = _httpClient;
 
     // Determine parent_file_id
@@ -325,7 +357,9 @@ class AliyunDriveSource extends BookSource {
       'order_direction': 'ASC',
     });
 
-    debugPrint('[Aliyun] browse path=[$path] parentId=[$parentId] driveId=[$_driveId]');
+    debugPrint(
+      '[Aliyun] browse path=[$path] parentId=[$parentId] driveId=[$_driveId]',
+    );
     final resp = await client.post(
       Uri.parse('https://api.aliyundrive.com/adrive/v2/file/list'),
       headers: _headers,
@@ -333,7 +367,9 @@ class AliyunDriveSource extends BookSource {
     );
 
     debugPrint('[Aliyun] browse response: ${resp.statusCode}');
-    debugPrint('[Aliyun] body: ${resp.body.substring(0, resp.body.length > 500 ? 500 : resp.body.length)}');
+    debugPrint(
+      '[Aliyun] body: ${resp.body.substring(0, resp.body.length > 500 ? 500 : resp.body.length)}',
+    );
     if (resp.statusCode != 200) {
       throw Exception('阿里云盘错误 ${resp.statusCode}: ${resp.body}');
     }
@@ -362,10 +398,7 @@ class AliyunDriveSource extends BookSource {
     final resp = await client.post(
       Uri.parse('https://api.aliyundrive.com/v2/file/get_download_url'),
       headers: _headers,
-      body: jsonEncode({
-        'drive_id': _driveId,
-        'file_id': filePath,
-      }),
+      body: jsonEncode({'drive_id': _driveId, 'file_id': filePath}),
     );
 
     if (resp.statusCode == 200) {
@@ -414,22 +447,22 @@ class SourceManager {
     await prefs.setString(_key, jsonEncode(list));
   }
 
-  void add(BookSource source) {
+  Future<void> add(BookSource source) async {
     sources.add(source);
-    save();
+    await save();
   }
 
-  void remove(int index) {
+  Future<void> remove(int index) async {
     if (index >= 0 && index < sources.length) {
       sources.removeAt(index);
-      save();
+      await save();
     }
   }
 
-  void toggle(int index) {
+  Future<void> toggle(int index) async {
     if (index >= 0 && index < sources.length) {
       sources[index].config.enabled = !sources[index].config.enabled;
-      save();
+      await save();
     }
   }
 }

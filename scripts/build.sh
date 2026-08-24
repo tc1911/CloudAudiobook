@@ -72,6 +72,46 @@ build_linux() {
     flutter build linux --release
 
     local bundle="build/linux/x64/release/bundle"
+    local package_root="$PROJECT_ROOT/build/linux/package-root"
+    local package_work="$PROJECT_ROOT/build/linux/package-work"
+    local package_name="cloud-audiobook"
+    local version="${VERSION_RAW%%+*}"
+    local revision="${VERSION_RAW#*+}"
+    [ "$revision" = "$VERSION_RAW" ] && revision=1
+    local dest="$BUILD_APPS_DIR/${MODE^}/linux"
+
+    rm -rf "$package_root" "$package_work"
+    mkdir -p "$package_root/usr/bin" "$package_root/usr/lib/$package_name/lib"
+    mkdir -p "$package_root/usr/share/applications"
+    mkdir -p "$package_root/usr/share/icons/hicolor/512x512/apps"
+
+    # Install the Flutter bundle under /usr/lib and use a wrapper to expose its libraries.
+    cp "$bundle/cloud_audiobook" "$package_root/usr/lib/$package_name/"
+    cp -r "$bundle/data/." "$package_root/usr/lib/$package_name/data/"
+    cp "$bundle/lib/"*.so "$package_root/usr/lib/$package_name/lib/"
+    [ -f /lib64/libmpv.so.2 ] && cp /lib64/libmpv.so.2 "$package_root/usr/lib/$package_name/lib/" || true
+    [ -f /usr/lib/x86_64-linux-gnu/libmpv.so.2 ] && cp /usr/lib/x86_64-linux-gnu/libmpv.so.2 "$package_root/usr/lib/$package_name/lib/" || true
+    chmod +x "$package_root/usr/lib/$package_name/cloud_audiobook"
+
+    cat > "$package_root/usr/bin/cloud-audiobook" << 'LAUNCHER'
+#!/bin/sh
+HERE="/usr/lib/cloud-audiobook"
+export LC_ALL=C
+export LD_LIBRARY_PATH="$HERE/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+exec "$HERE/cloud_audiobook" "$@"
+LAUNCHER
+    chmod +x "$package_root/usr/bin/cloud-audiobook"
+
+    cat > "$package_root/usr/share/applications/cloud-audiobook.desktop" << 'DESKTOP'
+[Desktop Entry]
+Name=云听书
+Exec=cloud-audiobook
+Icon=cloud-audiobook
+Type=Application
+Categories=AudioVideo;Player;
+DESKTOP
+    cp "$PROJECT_ROOT/web/icons/Icon-512.png" \
+        "$package_root/usr/share/icons/hicolor/512x512/apps/cloud-audiobook.png"
 
     # 准备 AppDir
     local appdir="$PROJECT_ROOT/CloudAudiobook.AppDir"
@@ -99,7 +139,7 @@ Icon=cloud-audiobook
 Type=Application
 Categories=AudioVideo;Player;
 DESKTOP
-    touch "$appdir/cloud-audiobook.png"
+    cp "$PROJECT_ROOT/web/icons/Icon-512.png" "$appdir/cloud-audiobook.png"
 
     # 打包 AppImage
     local appimage_tool="$PROJECT_ROOT/appimagetool-x86_64.AppImage"
@@ -109,14 +149,106 @@ DESKTOP
         chmod +x "$appimage_tool"
     fi
 
-    local output="cloud-audiobook-v1.0.3-x86_64.AppImage"
+    local output="cloud-audiobook-v${version}-x86_64.AppImage"
     rm -f "$output"
     ARCH=x86_64 "$appimage_tool" "$appdir" "$output"
 
-    local dest="$BUILD_APPS_DIR/${MODE^}/linux"
     mkdir -p "$dest"
     cp "$output" "$dest/"
     echo "[Linux] 完成 → $dest/$output"
+
+    # Debian package
+    if command -v dpkg-deb >/dev/null 2>&1; then
+        local deb_root="$package_work/deb"
+        mkdir -p "$deb_root/DEBIAN"
+        cp -r "$package_root/." "$deb_root/"
+        cat > "$deb_root/DEBIAN/control" << CONTROL
+Package: $package_name
+Version: $version
+Section: sound
+Priority: optional
+Architecture: amd64
+Maintainer: CloudAudiobook
+Description: Private audiobook library and player
+ CloudAudiobook plays audiobooks from local, WebDAV, and SMB sources.
+Depends: libgtk-3-0, libmpv2
+CONTROL
+        local deb_output="$dest/${package_name}_${version}_${revision}_amd64.deb"
+        dpkg-deb --build --root-owner-group "$deb_root" "$deb_output" >/dev/null
+        echo "[Linux] Debian 完成 → $deb_output"
+    else
+        echo "[跳过] 未找到 dpkg-deb，无法生成 .deb"
+    fi
+
+    # RPM package
+    if command -v rpmbuild >/dev/null 2>&1; then
+        local rpm_top="$package_work/rpm"
+        mkdir -p "$rpm_top/BUILD" "$rpm_top/RPMS" "$rpm_top/SOURCES" "$rpm_top/SPECS" "$rpm_top/SRPMS"
+        cp -r "$package_root" "$rpm_top/source-root"
+        cat > "$rpm_top/SPECS/$package_name.spec" << SPEC
+Name: $package_name
+Version: $version
+Release: $revision
+Summary: Private audiobook library and player
+License: MIT
+BuildArch: x86_64
+Requires: gtk3
+Requires: mpv-libs
+
+%description
+CloudAudiobook plays audiobooks from local, WebDAV, and SMB sources.
+
+%prep
+
+%build
+
+%install
+rm -rf %{buildroot}
+cp -a %{_topdir}/source-root/. %{buildroot}/
+
+%files
+/usr/bin/cloud-audiobook
+/usr/lib/cloud-audiobook
+/usr/share/applications/cloud-audiobook.desktop
+/usr/share/icons/hicolor/512x512/apps/cloud-audiobook.png
+
+%changelog
+* Mon Aug 24 2026 CloudAudiobook <noreply@localhost> - $version-$revision
+- Build package
+SPEC
+        rpmbuild --define "_topdir $rpm_top" -bb "$rpm_top/SPECS/$package_name.spec" >/dev/null
+        cp "$rpm_top/RPMS/x86_64/"*.rpm "$dest/"
+        echo "[Linux] RPM 完成 → $dest"
+    else
+        echo "[跳过] 未找到 rpmbuild，无法生成 .rpm"
+    fi
+
+    # Arch Linux package
+    if command -v makepkg >/dev/null 2>&1; then
+        local arch_work="$package_work/arch"
+        mkdir -p "$arch_work"
+        cp -r "$package_root" "$arch_work/package-root"
+        cat > "$arch_work/PKGBUILD" << PKGBUILD
+pkgname=$package_name
+pkgver=$version
+pkgrel=$revision
+pkgdesc='Private audiobook library and player'
+arch=('x86_64')
+license=('MIT')
+depends=('gtk3' 'mpv')
+source=()
+sha256sums=()
+
+package() {
+  cp -a "\$startdir/package-root/." "\$pkgdir/"
+}
+PKGBUILD
+        (cd "$arch_work" && makepkg --force --nodeps >/dev/null)
+        cp "$arch_work/${package_name}-${version}-${revision}-"*.pkg.tar.zst "$dest/"
+        echo "[Linux] Arch 完成 → $dest"
+    else
+        echo "[跳过] 未找到 makepkg，无法生成 .pkg.tar.zst"
+    fi
 }
 
 # 获取版本号
@@ -125,6 +257,7 @@ get_version() {
 }
 
 VERSION=$(get_version)
+VERSION_RAW="$VERSION"
 
 # 执行构建
 case "$PLATFORM" in

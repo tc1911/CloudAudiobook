@@ -5,21 +5,19 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform;
-import 'dart:io';
+import 'dart:io' show File, Platform;
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'blob_stub.dart'
-    if (dart.library.html) 'blob_web.dart';
+import 'blob_stub.dart' if (dart.library.html) 'blob_web.dart';
 import 'source.dart';
-import 'screens/source_list.dart';
 import 'screens/home_shell.dart';
 import 'book_db.dart';
 import 'theme_manager.dart';
 import 'platform/media_control.dart';
 
 void initMediaKit() {
-  if (!kIsWeb && (Platform.isWindows || Platform.isAndroid || Platform.isLinux)) {
+  if (!kIsWeb &&
+      (Platform.isWindows || Platform.isAndroid || Platform.isLinux)) {
     MediaKit.ensureInitialized();
   }
 }
@@ -92,7 +90,8 @@ class AudiobookCore {
   bool _isPlaying = false;
 
   /// Called every 3s with current position and source info
-  void Function(String source, String path, int positionMs, int durationMs)? onPositionUpdate;
+  void Function(String source, String path, int positionMs, int durationMs)?
+  onPositionUpdate;
 
   Duration get position => _player.state.position;
   Duration get duration => _player.state.duration;
@@ -120,7 +119,13 @@ class AudiobookCore {
     _startAutoSave();
   }
 
-  Future<void> loadUrl(String url, {String title = '', Map<String, String>? headers, int skipMs = 0, bool autoPlay = true}) async {
+  Future<void> loadUrl(
+    String url, {
+    String title = '',
+    Map<String, String>? headers,
+    int skipMs = 0,
+    bool autoPlay = true,
+  }) async {
     _currentSource = url;
     _currentTitle = title.isNotEmpty ? title : url.split('/').last;
     final spMs = _prefs?.getInt('pos_$url') ?? 0;
@@ -133,15 +138,18 @@ class AudiobookCore {
     }
     if (savedMs > 0) {
       // Wait for duration then seek
-      await _player.stream.duration.firstWhere((d) => d > Duration.zero).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => Duration.zero,
+      await _player.stream.duration
+          .firstWhere((d) => d > Duration.zero)
+          .timeout(const Duration(seconds: 10), onTimeout: () => Duration.zero);
+      debugPrint(
+        '[loadUrl] seeking to ${savedMs}ms, duration=${_player.state.duration}',
       );
-      debugPrint('[loadUrl] seeking to ${savedMs}ms, duration=${_player.state.duration}');
       await _player.seek(Duration(milliseconds: savedMs));
       // Wait briefly for position to update
       await Future.delayed(const Duration(milliseconds: 500));
-      debugPrint('[loadUrl] after seek position=${_player.state.position.inMilliseconds}ms');
+      debugPrint(
+        '[loadUrl] after seek position=${_player.state.position.inMilliseconds}ms',
+      );
     }
     _startAutoSave();
   }
@@ -172,7 +180,10 @@ class AudiobookCore {
 
   Future<void> saveNow() async {
     if (_currentSource.isNotEmpty) {
-      await _prefs?.setInt('pos_$_currentSource', _player.state.position.inMilliseconds);
+      await _prefs?.setInt(
+        'pos_$_currentSource',
+        _player.state.position.inMilliseconds,
+      );
     }
   }
 
@@ -200,7 +211,13 @@ class PlayerScreen extends StatefulWidget {
   final AudiobookCore? core;
   final dynamic bookDb;
   final void Function(String)? onTitleUpdate;
-  const PlayerScreen({super.key, required this.initialPositionMs, this.core, this.bookDb, this.onTitleUpdate});
+  const PlayerScreen({
+    super.key,
+    required this.initialPositionMs,
+    this.core,
+    this.bookDb,
+    this.onTitleUpdate,
+  });
 
   @override
   State<PlayerScreen> createState() => PlayerScreenState();
@@ -212,7 +229,6 @@ class PlayerScreenState extends State<PlayerScreen> {
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   bool _isPlaying = false;
-  bool _isSeeking = false;
   bool _sourceLoaded = false;
   String _currentTitle = '';
 
@@ -247,7 +263,8 @@ class PlayerScreenState extends State<PlayerScreen> {
       );
       // Auto-next when playback completes (player stops and position >= duration)
       if (!p && _playlist.length > 1 && _core.duration > Duration.zero) {
-        if (_core.position >= _core.duration - const Duration(milliseconds: 500)) {
+        if (_core.position >=
+            _core.duration - const Duration(milliseconds: 500)) {
           _playNext();
         }
       }
@@ -268,8 +285,17 @@ class PlayerScreenState extends State<PlayerScreen> {
     return '$h:$mm:$ss';
   }
 
-  void forcePlay() { _core.play(); _isPlaying = true; setState(() {}); }
-  void forcePause() { _core.pause(); _isPlaying = false; setState(() {}); }
+  void forcePlay() {
+    _core.play();
+    _isPlaying = true;
+    setState(() {});
+  }
+
+  void forcePause() {
+    _core.pause();
+    _isPlaying = false;
+    setState(() {});
+  }
 
   Future<void> togglePlay() async {
     _togglePlay();
@@ -291,7 +317,13 @@ class PlayerScreenState extends State<PlayerScreen> {
     }
   }
 
-  void loadFromSource(BookItem item, BookSource source, {List<BookItem>? allItems, int? resumeMs, bool autoPlay = true}) {
+  void loadFromSource(
+    BookItem item,
+    BookSource source, {
+    List<BookItem>? allItems,
+    int? resumeMs,
+    bool autoPlay = true,
+  }) {
     _playlist = allItems ?? [item];
     _playlistIndex = _playlist.indexWhere((i) => i.path == item.path);
     if (_playlistIndex < 0) _playlistIndex = 0;
@@ -316,12 +348,16 @@ class PlayerScreenState extends State<PlayerScreen> {
   String? _coverFilePath;
   final ScrollController _playlistScrollCtrl = ScrollController();
 
-  Future<void> _selectSourceItem(BookItem item, BookSource source, {int? resumeMs, bool autoPlay = true}) async {
+  Future<void> _selectSourceItem(
+    BookItem item,
+    BookSource source, {
+    int? resumeMs,
+    bool autoPlay = true,
+  }) async {
     debugPrint('[_selectSourceItem] autoPlay=$autoPlay resumeMs=$resumeMs');
     currentSource = source;
     _currentPlaylistPath = item.path;
     final url = await source.getStreamUrl(item.path);
-    if (url == null) return;
     if (url == null) return;
 
     _sourceLoaded = true;
@@ -346,11 +382,21 @@ class PlayerScreenState extends State<PlayerScreen> {
       }
     }
 
-    await _core.loadUrl(url, title: item.name, headers: headers, skipMs: savedMs, autoPlay: autoPlay);
+    await _core.loadUrl(
+      url,
+      title: item.name,
+      headers: headers,
+      skipMs: savedMs,
+      autoPlay: autoPlay,
+    );
     _saveToHistory(item, source);
     // Delay slightly so media is loaded and duration is available
     Future.delayed(const Duration(milliseconds: 500), () {
-      MediaControl().updateMetadata(title: item.name, artist: source.name, coverPath: _coverFilePath);
+      MediaControl().updateMetadata(
+        title: item.name,
+        artist: source.name,
+        coverPath: _coverFilePath,
+      );
       MediaControl().updatePlaybackState(
         playing: _core.isPlaying,
         positionMs: _core.position.inMilliseconds,
@@ -398,7 +444,17 @@ class PlayerScreenState extends State<PlayerScreen> {
   Future<void> _openFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['mp3', 'm4a', 'wav', 'flac', 'opus', 'ogg', 'aac', 'wma', 'aiff'],
+      allowedExtensions: [
+        'mp3',
+        'm4a',
+        'wav',
+        'flac',
+        'opus',
+        'ogg',
+        'aac',
+        'wma',
+        'aiff',
+      ],
       withData: kIsWeb,
     );
     if (result == null || result.files.isEmpty) return;
@@ -426,9 +482,6 @@ class PlayerScreenState extends State<PlayerScreen> {
     setState(() {});
     _core.play();
   }
-
-  void _seekForward() => _core.seek(_position + const Duration(seconds: 15));
-  void _seekBackward() => _core.seek(_position - const Duration(seconds: 15));
 
   VoidCallback? get callPlayNext => _playlist.length > 1 ? _playNext : null;
   VoidCallback? get callPlayPrev => _playlist.length > 1 ? _playPrev : null;
@@ -545,218 +598,276 @@ class PlayerScreenState extends State<PlayerScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                      // Album art — use cover from metadata if available
-                      Container(
-                        width: coverSize,
-                        height: coverSize,
-                        margin: const EdgeInsets.only(bottom: 24),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          color: cs.surfaceContainerHighest,
-                          boxShadow: [
-                            BoxShadow(
-                              color: cs.shadow.withValues(alpha: 0.3),
-                              blurRadius: 24,
-                              offset: const Offset(0, 8),
+                          // Album art — use cover from metadata if available
+                          Container(
+                            width: coverSize,
+                            height: coverSize,
+                            margin: const EdgeInsets.only(bottom: 24),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              color: cs.surfaceContainerHighest,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: cs.shadow.withValues(alpha: 0.3),
+                                  blurRadius: 24,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
+                              image: _coverFilePath != null
+                                  ? DecorationImage(
+                                      image: FileImage(File(_coverFilePath!)),
+                                      fit: BoxFit.cover,
+                                    )
+                                  : null,
                             ),
-                          ],
-                          image: _coverFilePath != null
-                              ? DecorationImage(
-                                  image: FileImage(File(_coverFilePath!)),
-                                  fit: BoxFit.cover,
-                                )
-                              : null,
-                        ),
-                        child: _coverFilePath == null
-                            ? Icon(
-                                Icons.library_music_rounded,
-                                size: coverSize * 0.4,
-                                color: cs.onSurfaceVariant.withValues(alpha: 0.6),
-                              )
-                            : null,
-                      ),
-                      // Book title
-                      Text(
-                        _sourceLoaded ? _currentTitle : '云听书',
-                        style: ts.titleLarge,
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _sourceLoaded ? '本地文件' : '点右上角文件夹图标选择音频',
-                        style: ts.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-                      ),
-                      // Time labels
-                      const SizedBox(height: 24),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: isWide ? 80 : 0),
-                        child: Column(
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            child: _coverFilePath == null
+                                ? Icon(
+                                    Icons.library_music_rounded,
+                                    size: coverSize * 0.4,
+                                    color: cs.onSurfaceVariant.withValues(
+                                      alpha: 0.6,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          // Book title
+                          Text(
+                            _sourceLoaded ? _currentTitle : '云听书',
+                            style: ts.titleLarge,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _sourceLoaded ? '本地文件' : '点右上角文件夹图标选择音频',
+                            style: ts.bodyMedium?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                          // Time labels
+                          const SizedBox(height: 24),
+                          Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isWide ? 80 : 0,
+                            ),
+                            child: Column(
                               children: [
-                                Text(_formatDuration(_position),
-                                    style: ts.labelMedium?.copyWith(color: cs.primary)),
-                                Text(_formatDuration(_duration),
-                                    style: ts.labelMedium?.copyWith(color: cs.onSurfaceVariant)),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      _formatDuration(_position),
+                                      style: ts.labelMedium?.copyWith(
+                                        color: cs.primary,
+                                      ),
+                                    ),
+                                    Text(
+                                      _formatDuration(_duration),
+                                      style: ts.labelMedium?.copyWith(
+                                        color: cs.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SliderTheme(
+                                  data: SliderThemeData(
+                                    trackHeight: 4,
+                                    thumbShape: const RoundSliderThumbShape(
+                                      enabledThumbRadius: 8,
+                                    ),
+                                    activeTrackColor: cs.primary,
+                                    inactiveTrackColor:
+                                        cs.surfaceContainerHighest,
+                                    thumbColor: cs.primary,
+                                  ),
+                                  child: Slider(
+                                    value: _duration.inMilliseconds > 0
+                                        ? _position.inMilliseconds
+                                              .toDouble()
+                                              .clamp(
+                                                0,
+                                                _duration.inMilliseconds
+                                                    .toDouble(),
+                                              )
+                                        : 0,
+                                    max: _duration.inMilliseconds > 0
+                                        ? _duration.inMilliseconds.toDouble()
+                                        : 1.0,
+                                    onChanged: (v) {
+                                      _core.seek(
+                                        Duration(milliseconds: v.toInt()),
+                                      );
+                                    },
+                                  ),
+                                ),
                               ],
                             ),
-                            SliderTheme(
-                              data: SliderThemeData(
-                                trackHeight: 4,
-                                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-                                activeTrackColor: cs.primary,
-                                inactiveTrackColor: cs.surfaceContainerHighest,
-                                thumbColor: cs.primary,
-                              ),
-                              child: Slider(
-                                value: _duration.inMilliseconds > 0
-                                    ? _position.inMilliseconds.toDouble().clamp(
-                                          0,
-                                          _duration.inMilliseconds.toDouble(),
-                                        )
-                                    : 0,
-                                max: _duration.inMilliseconds > 0
-                                    ? _duration.inMilliseconds.toDouble()
-                                    : 1.0,
-                                onChangeStart: (_) => _isSeeking = true,
-                                onChanged: (v) {
-                                  _core.seek(Duration(milliseconds: v.toInt()));
-                                },
-                                onChangeEnd: (_) => _isSeeking = false,
-                              ),
+                          ),
+                          // Controls
+                          const SizedBox(height: 16),
+                          Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: compact ? 8 : (isWide ? 160 : 32),
                             ),
-                          ],
-                        ),
-                      ),
-                      // Controls
-                      const SizedBox(height: 16),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: compact ? 8 : (isWide ? 160 : 32)),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            // Prev episode
-                            IconButton.filledTonal(
-                              onPressed: _playlist.length > 1 ? _playPrev : null,
-                              icon: const Icon(Icons.skip_previous_rounded),
-                              iconSize: compact ? 22 : 28,
-                              tooltip: '上一集',
-                              visualDensity: VisualDensity.compact,
-                            ),
-                            SizedBox(width: compact ? 8 : 16),
-                            FloatingActionButton(
-                              heroTag: 'player_play',
-                              onPressed: _togglePlay,
-                              elevation: 4,
-                              child: Icon(
-                                _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                                size: compact ? 32 : 40,
-                              ),
-                            ),
-                            SizedBox(width: compact ? 8 : 16),
-                            // Next episode
-                            IconButton.filledTonal(
-                              onPressed: _playlist.length > 1 ? _playNext : null,
-                              icon: const Icon(Icons.skip_next_rounded),
-                              iconSize: compact ? 22 : 28,
-                              tooltip: '下一集',
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Sleep timer
-                      const SizedBox(height: 24),
-                      _sleepSecondsLeft != null
-                          ? Row(
+                            child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.timer, color: cs.primary, size: 20),
-                                const SizedBox(width: 8),
-                                Text(
-                                  '${(_sleepSecondsLeft! ~/ 60).toString().padLeft(2, '0')}:${(_sleepSecondsLeft! % 60).toString().padLeft(2, '0')}',
-                                  style: ts.titleSmall?.copyWith(color: cs.primary),
+                                // Prev episode
+                                IconButton.filledTonal(
+                                  onPressed: _playlist.length > 1
+                                      ? _playPrev
+                                      : null,
+                                  icon: const Icon(Icons.skip_previous_rounded),
+                                  iconSize: compact ? 22 : 28,
+                                  tooltip: '上一集',
+                                  visualDensity: VisualDensity.compact,
                                 ),
-                                const SizedBox(width: 12),
-                                TextButton(
-                                  onPressed: _cancelSleepTimer,
-                                  child: const Text('取消'),
+                                SizedBox(width: compact ? 8 : 16),
+                                FloatingActionButton(
+                                  heroTag: 'player_play',
+                                  onPressed: _togglePlay,
+                                  elevation: 4,
+                                  child: Icon(
+                                    _isPlaying
+                                        ? Icons.pause_rounded
+                                        : Icons.play_arrow_rounded,
+                                    size: compact ? 32 : 40,
+                                  ),
                                 ),
-                              ],
-                            )
-                          : Wrap(
-                              alignment: WrapAlignment.center,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              spacing: 8,
-                              children: [
-                                Icon(Icons.timer_outlined, color: cs.onSurfaceVariant, size: 20),
-                                ..._sleepOptions.map((s) => ActionChip(
-                                      label: Text('${s}s'),
-                                      onPressed: () => _setSleepTimer(s),
-                                    )),
-                                ActionChip(
-                                  avatar: const Icon(Icons.more_time, size: 18),
-                                  label: const Text('自定义'),
-                                  onPressed: _showCustomTimerDialog,
+                                SizedBox(width: compact ? 8 : 16),
+                                // Next episode
+                                IconButton.filledTonal(
+                                  onPressed: _playlist.length > 1
+                                      ? _playNext
+                                      : null,
+                                  icon: const Icon(Icons.skip_next_rounded),
+                                  iconSize: compact ? 22 : 28,
+                                  tooltip: '下一集',
+                                  visualDensity: VisualDensity.compact,
                                 ),
                               ],
                             ),
-                      const SizedBox(height: 8),
-                    ],
+                          ),
+                          // Sleep timer
+                          const SizedBox(height: 24),
+                          _sleepSecondsLeft != null
+                              ? Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.timer,
+                                      color: cs.primary,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      '${(_sleepSecondsLeft! ~/ 60).toString().padLeft(2, '0')}:${(_sleepSecondsLeft! % 60).toString().padLeft(2, '0')}',
+                                      style: ts.titleSmall?.copyWith(
+                                        color: cs.primary,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    TextButton(
+                                      onPressed: _cancelSleepTimer,
+                                      child: const Text('取消'),
+                                    ),
+                                  ],
+                                )
+                              : Wrap(
+                                  alignment: WrapAlignment.center,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: 8,
+                                  children: [
+                                    Icon(
+                                      Icons.timer_outlined,
+                                      color: cs.onSurfaceVariant,
+                                      size: 20,
+                                    ),
+                                    ..._sleepOptions.map(
+                                      (s) => ActionChip(
+                                        label: Text('${s}s'),
+                                        onPressed: () => _setSleepTimer(s),
+                                      ),
+                                    ),
+                                    ActionChip(
+                                      avatar: const Icon(
+                                        Icons.more_time,
+                                        size: 18,
+                                      ),
+                                      label: const Text('自定义'),
+                                      onPressed: _showCustomTimerDialog,
+                                    ),
+                                  ],
+                                ),
+                          const SizedBox(height: 8),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-            // Playlist OUTSIDE the scroll — uses remaining space
-            if (_playlist.length > 1)
-              Container(
-                height: compact ? 140 : 120,
-                decoration: BoxDecoration(
-                  border: Border(top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3))),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(left: 24, top: 6),
-                      child: Text('播放列表 (${_playlist.length})', style: ts.titleSmall),
-                    ),
-                    Expanded(
-                      child: ListView.builder(
-                        controller: _playlistScrollCtrl,
-                        itemCount: _playlist.length,
-                        itemBuilder: (_, i) => ListTile(
-                          dense: true,
-                          visualDensity: VisualDensity.compact,
-                          leading: Icon(
-                            i == _playlistIndex ? Icons.play_arrow : Icons.audio_file_rounded,
-                            size: 18,
-                            color: i == _playlistIndex ? cs.primary : cs.onSurfaceVariant,
-                          ),
-                          title: Text(
-                            _playlist[i].name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: i == _playlistIndex ? cs.primary : null,
-                            ),
-                          ),
-                          onTap: () {
-                            setState(() => _playlistIndex = i);
-                            _selectSourceItem(_playlist[i], currentSource!);
-                          },
+                // Playlist OUTSIDE the scroll — uses remaining space
+                if (_playlist.length > 1)
+                  Container(
+                    height: compact ? 140 : 120,
+                    decoration: BoxDecoration(
+                      border: Border(
+                        top: BorderSide(
+                          color: cs.outlineVariant.withValues(alpha: 0.3),
                         ),
                       ),
                     ),
-                  ],
-                ),
-              ),
-            const SizedBox(height: 8),
-          ]); // Column end
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(left: 24, top: 6),
+                          child: Text(
+                            '播放列表 (${_playlist.length})',
+                            style: ts.titleSmall,
+                          ),
+                        ),
+                        Expanded(
+                          child: ListView.builder(
+                            controller: _playlistScrollCtrl,
+                            itemCount: _playlist.length,
+                            itemBuilder: (_, i) => ListTile(
+                              dense: true,
+                              visualDensity: VisualDensity.compact,
+                              leading: Icon(
+                                i == _playlistIndex
+                                    ? Icons.play_arrow
+                                    : Icons.audio_file_rounded,
+                                size: 18,
+                                color: i == _playlistIndex
+                                    ? cs.primary
+                                    : cs.onSurfaceVariant,
+                              ),
+                              title: Text(
+                                _playlist[i].name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: i == _playlistIndex
+                                      ? cs.primary
+                                      : null,
+                                ),
+                              ),
+                              onTap: () {
+                                setState(() => _playlistIndex = i);
+                                _selectSourceItem(_playlist[i], currentSource!);
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 8),
+              ],
+            ); // Column end
           },
         ),
       ),

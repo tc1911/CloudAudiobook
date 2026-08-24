@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
@@ -54,12 +55,15 @@ class SyncManager {
   }
 
   Future<void> _saveAll(SharedPreferences prefs) async {
-    await prefs.setString(_syncConfigKey, jsonEncode({
-      'sourceName': sourceName,
-      'remotePath': remotePath,
-      'autoUpload': autoUpload,
-      'autoDownload': autoDownload,
-    }));
+    await prefs.setString(
+      _syncConfigKey,
+      jsonEncode({
+        'sourceName': sourceName,
+        'remotePath': remotePath,
+        'autoUpload': autoUpload,
+        'autoDownload': autoDownload,
+      }),
+    );
   }
 
   /// Bind to source/book managers for auto operations
@@ -80,7 +84,8 @@ class SyncManager {
   /// Called on app startup — auto download if enabled
   Future<void> autoDownloadOnLaunch() async {
     await loadConfig();
-    if (!autoDownload || !configured || _sources == null || _books == null) return;
+    if (!autoDownload || !configured || _sources == null || _books == null)
+      return;
     debugPrint('[Sync] auto-downloading...');
     await download(_sources!, _books!);
   }
@@ -95,6 +100,11 @@ class SyncManager {
 
   // ─── Upload / Download ───
 
+  String _coverId(BookGroup group) {
+    final key = '${group.sourceName}:${group.folderKey}';
+    return sha256.convert(utf8.encode(key)).toString().substring(0, 32);
+  }
+
   WebdavSource? _findSource(SourceManager manager) {
     if (sourceName == null) return null;
     for (final s in manager.sources) {
@@ -106,13 +116,21 @@ class SyncManager {
   Future<String?> upload(SourceManager sources, BookDatabase books) async {
     final source = _findSource(sources);
     if (source == null) return '未找到同步目标书源: $sourceName';
-    final basePath = '/${remotePath?.replaceAll(RegExp(r'^/+|/+$'), '') ?? 'cloudaudiobook'}';
+    final basePath =
+        '/${remotePath?.replaceAll(RegExp(r'^/+|/+$'), '') ?? 'cloudaudiobook'}';
     try {
-      final sourcesJson = jsonEncode(sources.sources.map((s) => s.config.toJson()).toList());
+      // Credentials stay on the device and are never written to the sync target.
+      final sourcesJson = jsonEncode(
+        sources.sources
+            .map((s) => s.config.toJson(includeCredentials: false))
+            .toList(),
+      );
       await _putFile(source, '$basePath/sources.json', sourcesJson);
       final booksJson = jsonEncode(books.books.map((b) => b.toJson()).toList());
       await _putFile(source, '$basePath/books.json', booksJson);
-      final metasJson = jsonEncode(books.metas.map((k, v) => MapEntry(k, v.toJson())));
+      final metasJson = jsonEncode(
+        books.metas.map((k, v) => MapEntry(k, v.toJson())),
+      );
       await _putFile(source, '$basePath/metas.json', metasJson);
       // Upload cover images (ensure covers/ dir exists first)
       await _mkcol(source, '$basePath/covers');
@@ -122,7 +140,7 @@ class SyncManager {
           try {
             final bytes = File(cover).readAsBytesSync();
             final ext = cover.split('.').last;
-            final path = '$basePath/covers/${group.folderKey.hashCode}.$ext';
+            final path = '$basePath/covers/${_coverId(group)}.$ext';
             print('[Sync] cover upload $path: ${bytes.length} bytes');
             await _putRawFile(source, path, bytes);
             print('[Sync] cover upload OK');
@@ -142,7 +160,8 @@ class SyncManager {
   Future<String?> download(SourceManager sources, BookDatabase books) async {
     final source = _findSource(sources);
     if (source == null) return '未找到同步目标书源: $sourceName';
-    final basePath = '/${remotePath?.replaceAll(RegExp(r'^/+|/+$'), '') ?? 'cloudaudiobook'}';
+    final basePath =
+        '/${remotePath?.replaceAll(RegExp(r'^/+|/+$'), '') ?? 'cloudaudiobook'}';
     try {
       final sourcesBody = await _getFile(source, '$basePath/sources.json');
       if (sourcesBody != null) {
@@ -151,7 +170,7 @@ class SyncManager {
             .toList();
         for (final rs in remoteSources) {
           final exists = sources.sources.any((s) => s.config.id == rs.id);
-          if (!exists) sources.add(sources.createSource(rs));
+          if (!exists) await sources.add(sources.createSource(rs));
         }
       }
       final booksBody = await _getFile(source, '$basePath/books.json');
@@ -165,7 +184,8 @@ class SyncManager {
             books.books.add(rb);
           } else {
             final existing = books.books.firstWhere((b) => b.id == rb.id);
-            if (rb.lastPlayedAt > existing.lastPlayedAt || rb.positionMs > existing.positionMs) {
+            if (rb.lastPlayedAt > existing.lastPlayedAt ||
+                rb.positionMs > existing.positionMs) {
               existing.positionMs = rb.positionMs;
               existing.durationMs = rb.durationMs;
               existing.lastPlayedAt = rb.lastPlayedAt;
@@ -180,20 +200,24 @@ class SyncManager {
       if (metasBody != null) {
         final remoteMetas = jsonDecode(metasBody) as Map<String, dynamic>;
         for (final e in remoteMetas.entries) {
-          books.metas[e.key] = BookMeta.fromJson(e.value as Map<String, dynamic>);
+          books.metas[e.key] = BookMeta.fromJson(
+            e.value as Map<String, dynamic>,
+          );
         }
         await books.saveMetas();
       }
       // Download cover images
       for (final group in books.bookGroups) {
         for (final ext in ['jpg', 'jpeg', 'png', 'webp']) {
-          final path = '$basePath/covers/${group.folderKey.hashCode}.$ext';
+          final path = '$basePath/covers/${_coverId(group)}.$ext';
           final coverBytes = await _getRawFile(source, path);
-          print('[Sync] cover download $path: ${coverBytes != null ? "${coverBytes.length} bytes" : "NOT FOUND"}');
+          print(
+            '[Sync] cover download $path: ${coverBytes != null ? "${coverBytes.length} bytes" : "NOT FOUND"}',
+          );
           if (coverBytes != null) {
             final appDir = await getApplicationDocumentsDirectory();
             final dest = File(
-              '${appDir.path}/cloud_audiobook_cover_${group.folderKey.hashCode}.$ext',
+              '${appDir.path}/cloud_audiobook_cover_${_coverId(group)}.$ext',
             );
             await dest.writeAsBytes(coverBytes);
             print('[Sync] cover saved to ${dest.path}');
@@ -218,12 +242,18 @@ class SyncManager {
     final client = source.httpClient;
     try {
       // Ignore errors — directory may already exist
-      await client.send(http.Request('MKCOL', Uri.parse(url))
-        ..headers['Authorization'] = source.authHeader());
+      await client.send(
+        http.Request('MKCOL', Uri.parse(url))
+          ..headers['Authorization'] = source.authHeader(),
+      );
     } catch (_) {}
   }
 
-  Future<void> _putRawFile(WebdavSource source, String path, List<int> bytes) async {
+  Future<void> _putRawFile(
+    WebdavSource source,
+    String path,
+    List<int> bytes,
+  ) async {
     final url = source.url(path);
     final client = source.httpClient;
     final resp = await client.put(
@@ -234,10 +264,15 @@ class SyncManager {
       },
       body: bytes,
     );
-    if (resp.statusCode >= 400) throw Exception('PUT $path: ${resp.statusCode}');
+    if (resp.statusCode >= 400)
+      throw Exception('PUT $path: ${resp.statusCode}');
   }
 
-  Future<void> _putFile(WebdavSource source, String path, String content) async {
+  Future<void> _putFile(
+    WebdavSource source,
+    String path,
+    String content,
+  ) async {
     final url = source.url(path);
     final client = source.httpClient;
     final resp = await client.put(
@@ -248,7 +283,8 @@ class SyncManager {
       },
       body: content,
     );
-    if (resp.statusCode >= 400) throw Exception('PUT $path: ${resp.statusCode}');
+    if (resp.statusCode >= 400)
+      throw Exception('PUT $path: ${resp.statusCode}');
   }
 
   Future<List<int>?> _getRawFile(WebdavSource source, String path) async {
@@ -271,7 +307,8 @@ class SyncManager {
       headers: {'Authorization': source.authHeader()},
     );
     if (resp.statusCode == 404) return null;
-    if (resp.statusCode >= 400) throw Exception('GET $path: ${resp.statusCode}');
+    if (resp.statusCode >= 400)
+      throw Exception('GET $path: ${resp.statusCode}');
     return resp.body;
   }
 }
