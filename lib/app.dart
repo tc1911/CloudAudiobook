@@ -256,7 +256,10 @@ class PlayerScreenState extends State<PlayerScreen> {
         );
       }
     };
-    _core.positionStream.listen((p) => setState(() => _position = p));
+    _core.positionStream.listen((p) {
+      setState(() => _position = p);
+      LinuxMpris().updatePosition(p);
+    });
     _core.durationStream.listen((d) => setState(() => _duration = d));
     _core.playingStream.listen((p) {
       setState(() => _isPlaying = p);
@@ -291,7 +294,9 @@ class PlayerScreenState extends State<PlayerScreen> {
 
   @override
   void dispose() {
-    _core.dispose();
+    if (widget.core == null) {
+      _core.dispose();
+    }
     _sleepTimer?.cancel();
     super.dispose();
   }
@@ -316,6 +321,8 @@ class PlayerScreenState extends State<PlayerScreen> {
   Future<void> togglePlay() async {
     await _togglePlay();
   }
+
+  Future<void> seekTo(Duration position) => _core.seek(position);
 
   Future<void> _togglePlay() async {
     if (_isPlaying) {

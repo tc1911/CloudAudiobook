@@ -1,6 +1,8 @@
 import 'dart:async';
-import 'dart:io' show Platform, exit;
+import 'dart:io' show Directory, File, Platform, exit;
+import 'package:path/path.dart' as p;
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -15,6 +17,7 @@ class PlatformIntegration with WindowListener, TrayListener {
   bool _playing = false;
   bool _canGoNext = false;
   bool _canGoPrevious = false;
+  bool _closeToTray = true;
   bool _exiting = false;
 
   Future<void> init({
@@ -31,15 +34,18 @@ class PlatformIntegration with WindowListener, TrayListener {
     _onNext = onNext;
     _onPrevious = onPrevious;
     _onExit = onExit;
+    final prefs = await SharedPreferences.getInstance();
+    _closeToTray = prefs.getBool('cloud_audiobook_close_to_tray') ?? true;
 
     await windowManager.ensureInitialized();
     trayManager.addListener(this);
 
-    await trayManager.setIcon(
-      Platform.isWindows
-          ? 'windows/runner/resources/app_icon.ico'
-          : 'web/icons/Icon-512.png',
-    );
+    final iconPath = _trayIconPath();
+    if (iconPath != null) {
+      await trayManager.setIcon(iconPath);
+    } else {
+      debugPrint('[Tray] icon not found; tray may be unavailable');
+    }
     if (!Platform.isLinux) {
       await trayManager.setToolTip('云听书');
     }
@@ -59,6 +65,47 @@ class PlatformIntegration with WindowListener, TrayListener {
         await windowManager.focus();
       },
     );
+  }
+
+  String? _trayIconPath() {
+    final executableDir = p.dirname(Platform.resolvedExecutable);
+    final candidates = Platform.isWindows
+        ? [
+            p.join(
+              executableDir,
+              'data',
+              'flutter_assets',
+              'assets',
+              'windows',
+              'runner',
+              'resources',
+              'app_icon.ico',
+            ),
+            p.join(
+              Directory.current.path,
+              'windows',
+              'runner',
+              'resources',
+              'app_icon.ico',
+            ),
+          ]
+        : [
+            '/usr/share/icons/hicolor/512x512/apps/cloud-audiobook.png',
+            p.join(
+              executableDir,
+              'data',
+              'flutter_assets',
+              'assets',
+              'web',
+              'icons',
+              'Icon-512.png',
+            ),
+            p.join(Directory.current.path, 'web', 'icons', 'Icon-512.png'),
+          ];
+    for (final path in candidates) {
+      if (File(path).existsSync()) return path;
+    }
+    return null;
   }
 
   /// Update window title with current track info
@@ -87,6 +134,11 @@ class PlatformIntegration with WindowListener, TrayListener {
           MenuItem(key: 'previous', label: '上一集', disabled: !_canGoPrevious),
           MenuItem(key: 'next', label: '下一集', disabled: !_canGoNext),
           MenuItem.separator(),
+          MenuItem.checkbox(
+            key: 'close_to_tray',
+            label: '关闭窗口时保留在托盘',
+            checked: _closeToTray,
+          ),
           MenuItem(key: 'exit', label: '退出'),
         ],
       ),
@@ -101,7 +153,12 @@ class PlatformIntegration with WindowListener, TrayListener {
 
   @override
   void onWindowClose() {
-    if (!_exiting) unawaited(windowManager.hide());
+    if (_exiting) return;
+    if (_closeToTray) {
+      unawaited(windowManager.hide());
+    } else {
+      unawaited(_exitApp());
+    }
   }
 
   @override
@@ -120,9 +177,18 @@ class PlatformIntegration with WindowListener, TrayListener {
         unawaited(_onPrevious?.call() ?? Future.value());
       case 'next':
         unawaited(_onNext?.call() ?? Future.value());
+      case 'close_to_tray':
+        _closeToTray = !_closeToTray;
+        unawaited(_saveCloseToTray());
+        unawaited(_updateTrayMenu());
       case 'exit':
         unawaited(_exitApp());
     }
+  }
+
+  Future<void> _saveCloseToTray() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('cloud_audiobook_close_to_tray', _closeToTray);
   }
 
   Future<void> _exitApp() async {

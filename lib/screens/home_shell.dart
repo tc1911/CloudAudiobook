@@ -66,6 +66,7 @@ class _HomeShellState extends State<HomeShell> {
         },
         onNext: () async => _playerKey.currentState?.callPlayNext?.call(),
         onPrevious: () async => _playerKey.currentState?.callPlayPrev?.call(),
+        onSeek: (position) async => _playerKey.currentState?.seekTo(position),
       );
     });
   }

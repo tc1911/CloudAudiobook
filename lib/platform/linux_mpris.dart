@@ -4,6 +4,7 @@ import 'dart:io' show Platform;
 import 'package:dbus/dbus.dart';
 
 typedef MediaCommand = Future<void> Function();
+typedef MediaSeekCommand = Future<void> Function(Duration position);
 
 const _mprisService = 'org.mpris.MediaPlayer2.CloudAudiobook';
 final _mprisPath = DBusObjectPath('/org/mpris/MediaPlayer2');
@@ -23,6 +24,7 @@ class LinuxMpris {
     required MediaCommand onPause,
     required MediaCommand onNext,
     required MediaCommand onPrevious,
+    required MediaSeekCommand onSeek,
   }) async {
     if (!Platform.isLinux) return;
     try {
@@ -39,6 +41,7 @@ class LinuxMpris {
         onPause: onPause,
         onNext: onNext,
         onPrevious: onPrevious,
+        onSeek: onSeek,
       );
       await client.registerObject(player);
       _client = client;
@@ -74,6 +77,16 @@ class LinuxMpris {
     );
   }
 
+  Future<void> updatePosition(Duration position) async {
+    final player = _player;
+    if (player == null) return;
+    player.position = position;
+    await player.emitPropertiesChanged(
+      _mprisPlayerInterface,
+      changedProperties: {'Position': DBusInt64(position.inMicroseconds)},
+    );
+  }
+
   Future<void> dispose() async {
     final client = _client;
     final player = _player;
@@ -94,12 +107,14 @@ class _MprisPlayer extends DBusObject {
     required this.onPause,
     required this.onNext,
     required this.onPrevious,
+    required this.onSeek,
   });
 
   final MediaCommand onPlay;
   final MediaCommand onPause;
   final MediaCommand onNext;
   final MediaCommand onPrevious;
+  final MediaSeekCommand onSeek;
 
   String title = '';
   String artist = '';
@@ -134,7 +149,7 @@ class _MprisPlayer extends DBusObject {
     'CanGoPrevious': DBusBoolean(canGoPrevious),
     'CanPlay': DBusBoolean(title.isNotEmpty),
     'CanPause': DBusBoolean(title.isNotEmpty),
-    'CanSeek': DBusBoolean(false),
+    'CanSeek': DBusBoolean(true),
     'CanControl': DBusBoolean(true),
     'Metadata': _metadata,
   };
@@ -169,7 +184,7 @@ class _MprisPlayer extends DBusObject {
     'CanGoPrevious': DBusBoolean(canGoPrevious),
     'CanPlay': DBusBoolean(title.isNotEmpty),
     'CanPause': DBusBoolean(title.isNotEmpty),
-    'CanSeek': DBusBoolean(false),
+    'CanSeek': DBusBoolean(true),
     'CanControl': DBusBoolean(true),
   };
 
@@ -218,7 +233,14 @@ class _MprisPlayer extends DBusObject {
     DBusIntrospectInterface(
       _mprisPlayerInterface,
       methods: [
-        for (final name in ['Play', 'Pause', 'PlayPause', 'Next', 'Previous'])
+        for (final name in [
+          'Play',
+          'Pause',
+          'PlayPause',
+          'Next',
+          'Previous',
+          'Seek',
+        ])
           DBusIntrospectMethod(name),
       ],
       properties: [
@@ -258,6 +280,10 @@ class _MprisPlayer extends DBusObject {
         await onNext();
       case 'Previous':
         await onPrevious();
+      case 'Seek':
+        if (call.values.length == 1) {
+          await onSeek(Duration(microseconds: call.values.first.asInt64()));
+        }
     }
     return DBusMethodSuccessResponse();
   }
