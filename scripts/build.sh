@@ -104,8 +104,6 @@ build_linux() {
     cp "$bundle/cloud_audiobook" "$package_root/usr/lib/$package_name/"
     cp -r "$bundle/data/." "$package_root/usr/lib/$package_name/data/"
     cp "$bundle/lib/"*.so "$package_root/usr/lib/$package_name/lib/"
-    [ -f /lib64/libmpv.so.2 ] && cp /lib64/libmpv.so.2 "$package_root/usr/lib/$package_name/lib/" || true
-    [ -f /usr/lib/x86_64-linux-gnu/libmpv.so.2 ] && cp /usr/lib/x86_64-linux-gnu/libmpv.so.2 "$package_root/usr/lib/$package_name/lib/" || true
     chmod +x "$package_root/usr/lib/$package_name/cloud_audiobook"
 
     cat > "$package_root/usr/bin/cloud-audiobook" << 'LAUNCHER'

@@ -130,9 +130,6 @@ jobs:
           cp "$bundle/cloud_audiobook" "$root/usr/lib/cloud-audiobook/"
           cp -r "$bundle/data/." "$root/usr/lib/cloud-audiobook/data/"
           cp "$bundle/lib/"*.so "$root/usr/lib/cloud-audiobook/lib/"
-          if [[ -f /usr/lib/x86_64-linux-gnu/libmpv.so.2 ]]; then
-            cp /usr/lib/x86_64-linux-gnu/libmpv.so.2 "$root/usr/lib/cloud-audiobook/lib/"
-          fi
           printf '%s\n' '#!/bin/sh' \
             'HERE=/usr/lib/cloud-audiobook' \
             'export LD_LIBRARY_PATH="$HERE/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"' \
