@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:cloud_audiobook/book_db.dart';
 import 'package:cloud_audiobook/metadata.dart';
 import 'package:cloud_audiobook/playback_controller.dart';
+import 'package:cloud_audiobook/screens/settings.dart';
 import 'package:cloud_audiobook/source.dart';
 
 void main() {
@@ -100,5 +101,11 @@ void main() {
     await controller.seek(const Duration(seconds: 12));
 
     expect(events, ['play', 'pause', 'next', 'previous', 'seek:12']);
+  });
+
+  test('formats release build suffixes', () {
+    expect(formatAppVersion('1.1.0', '0'), 'v1.1.0-0');
+    expect(formatAppVersion('1.1.0', '1'), 'v1.1.0');
+    expect(formatAppVersion('1.1.0', '2'), 'v1.1.0-2');
   });
 }
